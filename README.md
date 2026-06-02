@@ -104,7 +104,7 @@ Pillow>=9.0.0
 ### Consoles
 - **PlayStation** (1, 2, 3)
 - **Xbox** (Original, 360)
-- **Nintendo** (Wii, GameCube, 64)
+- **Nintendo** (Switch, Wii, GameCube, 64)
 - **Sega** (Dreamcast, Genesis, Game Gear, Saturn)
 - **TurboGrafx-16**
 
@@ -237,6 +237,15 @@ Pillow>=9.0.0
 ### Images not loading?
 - Install Pillow: `pip install Pillow`
 - Check image format (PNG, JPG, JPEG, WEBP)
+
+## 🤝 Contributing
+
+Contributions welcome! Areas for improvement:
+- Online metadata fetching (IGDB, TheGamesDB)
+- Cloud sync support
+- Controller support for navigation
+- Game state save management
+- Achievement tracking
 
 ## 📜 License
 
