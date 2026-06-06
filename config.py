@@ -21,6 +21,7 @@ class ConfigManager:
         
         self.config = {
             "game_library_paths": [],
+            "emulator_search_paths": [],
             "emulators": {},
             "custom_covers": {},
             "game_metadata": {},      # Contains title, notes, tags, developer, release_date, summary, sessions list
