@@ -321,87 +321,123 @@ class SpacedListItemDelegate(QStyledItemDelegate):
 class GameBriefInfoModal(QDialog):
     def __init__(self, game_data, cover_pixmap, parent=None):
         super().__init__(parent)
+        from PyQt6.QtWidgets import QGraphicsDropShadowEffect
+        
         self.game_data = game_data
-        self.setWindowTitle(f"Brief Info - {game_data.get('title')}")
-        self.setMinimumSize(560, 360)
+        self.setWindowTitle(f"Info - {game_data.get('title')}")
+        self.setMinimumSize(680, 420)
         self.setStyleSheet(f"""
             QDialog {{
                 background-color: {Constants.C_BG_DARK};
                 color: {Constants.C_TEXT_PRIMARY};
-                border: 2px solid {Constants.C_BORDER};
-                border-radius: 8px;
+                border: 1px solid {Constants.C_BORDER};
+                border-radius: 12px;
             }}
-            QLabel {{
-                color: {Constants.C_TEXT_PRIMARY};
-            }}
+            QLabel {{ color: {Constants.C_TEXT_PRIMARY}; }}
         """)
         
         main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(16, 16, 16, 16)
-        main_layout.setSpacing(16)
+        main_layout.setContentsMargins(24, 24, 24, 24)
+        main_layout.setSpacing(24)
         
-        # Left side: Poster
+        # Left side: Poster with Drop Shadow
+        poster_container = QWidget()
+        poster_container.setFixedSize(220, 310)
+        poster_layout = QVBoxLayout(poster_container)
+        poster_layout.setContentsMargins(0, 0, 0, 0)
+        
         poster_label = QLabel()
-        poster_label.setFixedSize(180, 260)
+        poster_label.setFixedSize(220, 310)
         poster_label.setScaledContents(True)
         if cover_pixmap and not cover_pixmap.isNull():
-            poster_label.setPixmap(cover_pixmap.scaled(180, 260, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation))
+            # Add rounded corners to the pixmap
+            rounded = QPixmap(cover_pixmap.size())
+            rounded.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(rounded)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            path = QPainterPath()
+            path.addRoundedRect(QRectF(rounded.rect()), 12, 12)
+            painter.setClipPath(path)
+            painter.drawPixmap(0, 0, cover_pixmap)
+            painter.end()
+            poster_label.setPixmap(rounded.scaled(220, 310, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation))
         else:
-            poster_label.setStyleSheet(f"background-color: {Constants.C_BG_PANEL}; border: 1px solid {Constants.C_BORDER}; border-radius: 4px;")
+            poster_label.setStyleSheet(f"background-color: {Constants.C_BG_PANEL}; border: 1px solid {Constants.C_BORDER}; border-radius: 12px;")
             poster_label.setText("No Cover")
             poster_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(poster_label)
+        
+        # Add shadow effect
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 180))
+        shadow.setOffset(0, 8)
+        poster_label.setGraphicsEffect(shadow)
+        
+        poster_layout.addWidget(poster_label)
+        main_layout.addWidget(poster_container)
         
         # Right side: Details
         details_widget = QWidget()
         details_layout = QVBoxLayout(details_widget)
         details_layout.setContentsMargins(0, 0, 0, 0)
+        details_layout.setSpacing(12)
         
         # Title
         title_label = QLabel(game_data.get("title"))
-        title_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        title_label.setFont(QFont("Segoe UI", 22, QFont.Weight.ExtraBold))
         title_label.setWordWrap(True)
         details_layout.addWidget(title_label)
         
-        # Developer & Release Date
-        dev = game_data.get("developer", "Unknown Developer")
-        rel = game_data.get("release_date", "N/A")
-        sub_info = QLabel(f"Developer: <b style='color:{Constants.C_ACCENT_CYAN};'>{dev}</b><br>Released: <b>{rel}</b>")
-        sub_info.setFont(QFont("Segoe UI", 9))
-        sub_info.setTextFormat(Qt.TextFormat.RichText)
-        details_layout.addWidget(sub_info)
+        # Badges Layout (Platform, Dev, Year)
+        badges_layout = QHBoxLayout()
+        badges_layout.setSpacing(8)
         
-        # Platform
         plat = game_data.get("platform", "N/A")
-        platform_info = QLabel(f"Platform: <b>{plat}</b>")
-        platform_info.setFont(QFont("Segoe UI", 10))
-        details_layout.addWidget(platform_info)
+        rel = game_data.get("release_date", "N/A")
+        dev = game_data.get("developer", "Unknown Developer")
+        
+        def create_badge(text, color):
+            lbl = QLabel(text)
+            lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            lbl.setStyleSheet(f"background-color: {color}; color: #ffffff; padding: 4px 10px; border-radius: 10px;")
+            return lbl
+            
+        badges_layout.addWidget(create_badge(plat, Constants.C_ACCENT_CYAN))
+        if rel != "N/A":
+            year = rel.split("-")[0] if "-" in rel else rel
+            badges_layout.addWidget(create_badge(year, "#34495e"))
+        
+        badges_layout.addStretch()
+        details_layout.addLayout(badges_layout)
+        
+        dev_label = QLabel(f"Developed by <b style='color:{Constants.C_TEXT_PRIMARY};'>{dev}</b>")
+        dev_label.setFont(QFont("Segoe UI", 10))
+        dev_label.setStyleSheet(f"color: {Constants.C_TEXT_SECONDARY};")
+        details_layout.addWidget(dev_label)
         
         # Clickable File / Installation path location
         raw_path = game_data.get("path", "")
         if raw_path:
-            path_widget = QWidget()
-            path_layout = QHBoxLayout(path_widget)
+            path_layout = QHBoxLayout()
             path_layout.setContentsMargins(0, 0, 0, 0)
-            path_layout.setSpacing(4)
-            
-            path_title = QLabel("Location:")
-            path_title.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-            path_title.setStyleSheet(f"color: {Constants.C_TEXT_MUTED};")
-            path_layout.addWidget(path_title)
+            path_layout.setSpacing(6)
             
             # Shorten the path for clean look
             display_path = raw_path
-            if len(raw_path) > 40:
-                display_path = "..." + raw_path[-37:]
+            if len(raw_path) > 45:
+                display_path = "..." + raw_path[-42:]
                 
+            path_icon = QLabel("📁")
+            path_icon.setFont(QFont("Segoe UI", 10))
+            path_layout.addWidget(path_icon)
+            
             path_btn = QPushButton(display_path)
             path_btn.setFlat(True)
             path_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             path_btn.setToolTip(raw_path)
             path_btn.setStyleSheet(f"""
                 QPushButton {{
-                    color: {Constants.C_ACCENT_CYAN};
+                    color: {Constants.C_TEXT_MUTED};
                     text-align: left;
                     padding: 0px;
                     border: none;
@@ -410,7 +446,7 @@ class GameBriefInfoModal(QDialog):
                     font-size: 11px;
                 }}
                 QPushButton:hover {{
-                    color: #ffffff;
+                    color: {Constants.C_ACCENT_CYAN};
                 }}
             """)
             
@@ -428,52 +464,87 @@ class GameBriefInfoModal(QDialog):
                         QMessageBox.warning(self, "Unavailable", f"File path does not exist:\n{raw_path}")
                         
             path_btn.clicked.connect(open_and_select_file)
-            path_layout.addWidget(path_btn, 1)
-            details_layout.addWidget(path_widget)
+            path_layout.addWidget(path_btn)
+            path_layout.addStretch()
+            details_layout.addLayout(path_layout)
         
         # Playtime hours
         hours = game_data.get("playtime", 0) / 3600.0
-        time_text = "Never Played" if hours == 0 else f"{hours:.1f} hours played"
+        time_text = "⏱ Never Played" if hours == 0 else f"⏱ {hours:.1f} hours on record"
         playtime_label = QLabel(time_text)
-        playtime_label.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        playtime_label.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         playtime_label.setStyleSheet(f"color: {Constants.C_SUCCESS if hours > 0 else Constants.C_TEXT_MUTED};")
         details_layout.addWidget(playtime_label)
         
-        details_layout.addSpacing(10)
-        
         # Summary/Description
-        summary_title = QLabel("Description:")
-        summary_title.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        summary_title.setStyleSheet(f"color: {Constants.C_TEXT_MUTED};")
-        details_layout.addWidget(summary_title)
-        
         summary_box = QTextEdit()
         summary_box.setReadOnly(True)
-        summary_box.setPlainText(game_data.get("summary", "No details fetched yet. Enter your IGDB API keys in settings to automatically fetch metadata!"))
+        summary_box.setPlainText(game_data.get("summary", "No description available."))
         summary_box.setStyleSheet(f"""
             QTextEdit {{
-                background-color: {Constants.C_BG_PANEL};
-                border: 1px solid {Constants.C_BORDER};
-                border-radius: 4px;
+                background-color: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
                 color: {Constants.C_TEXT_SECONDARY};
-                padding: 6px;
+                padding: 12px;
+                font-family: "Segoe UI";
+                font-size: 13px;
+                line-height: 1.5;
+            }}
+            QScrollBar:vertical {{
+                border: none;
+                background: transparent;
+                width: 8px;
+                margin: 4px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {Constants.C_BORDER};
+                border-radius: 4px;
+                min-height: 20px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {Constants.C_TEXT_MUTED};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                border: none;
+                background: none;
             }}
         """)
-        details_layout.addWidget(summary_box)
+        details_layout.addWidget(summary_box, 1)
         
         # Dialog Buttons
         button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 8, 0, 0)
         button_layout.addStretch()
         
+        close_btn = QPushButton("Close")
+        close_btn.setFixedSize(100, 36)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1px solid {Constants.C_BORDER};
+                color: {Constants.C_TEXT_PRIMARY};
+                border-radius: 6px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: rgba(255,255,255,0.05);
+                border-color: {Constants.C_TEXT_MUTED};
+            }}
+        """)
+        close_btn.clicked.connect(self.reject)
+        button_layout.addWidget(close_btn)
+        
         play_btn = QPushButton("▶ PLAY")
-        play_btn.setMinimumHeight(32)
+        play_btn.setFixedSize(120, 36)
+        play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         play_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {Constants.C_ACCENT_VIOLET};
                 color: #ffffff;
                 font-weight: bold;
-                border-radius: 4px;
-                padding: 6px 20px;
+                border-radius: 6px;
                 border: none;
             }}
             QPushButton:hover {{
@@ -482,23 +553,6 @@ class GameBriefInfoModal(QDialog):
         """)
         play_btn.clicked.connect(self.accept)
         button_layout.addWidget(play_btn)
-        
-        close_btn = QPushButton("Close")
-        close_btn.setMinimumHeight(32)
-        close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {Constants.C_BG_PANEL};
-                border: 1px solid {Constants.C_BORDER};
-                color: {Constants.C_TEXT_PRIMARY};
-                border-radius: 4px;
-                padding: 6px 16px;
-            }}
-            QPushButton:hover {{
-                background-color: {Constants.C_BORDER};
-            }}
-        """)
-        close_btn.clicked.connect(self.reject)
-        button_layout.addWidget(close_btn)
         
         details_layout.addLayout(button_layout)
         main_layout.addWidget(details_widget, 1)

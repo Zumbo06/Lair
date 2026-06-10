@@ -654,6 +654,12 @@ class EmulatorHubWindow(QMainWindow):
         btn_edit_emu.clicked.connect(self.edit_selected_emulator)
         btn_layout.addWidget(btn_edit_emu)
         
+        btn_run_emu = QPushButton("▶ RUN EMULATOR")
+        btn_run_emu.setStyleSheet(btn_style_cyan)
+        btn_run_emu.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_run_emu.clicked.connect(self.run_selected_emulator)
+        btn_layout.addWidget(btn_run_emu)
+        
         btn_remove = QPushButton("🗑 REMOVE SELECTED")
         btn_remove.setStyleSheet(btn_style_error)
         btn_remove.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -796,7 +802,8 @@ class EmulatorHubWindow(QMainWindow):
                 "release_date": game.get("release_date", "N/A"),
                 "summary": game.get("summary", ""),
                 "tracking_exe": game.get("tracking_exe", ""),
-                "game_dir": game.get("game_dir", "")
+                "game_dir": game.get("game_dir", ""),
+                "auto_fetch_disabled": game.get("auto_fetch_disabled", False)
             }
             
         self.rebuild_platform_mappings()
@@ -1639,7 +1646,7 @@ class EmulatorHubWindow(QMainWindow):
                     game_data.get("developer") == "Unknown Developer" or 
                     not cover_path.exists()
                 )
-                if is_placeholder:
+                if is_placeholder and not game_data.get("auto_fetch_disabled", False):
                     self.enriching_hashes.add(game_data["hash"])
                     self.fetch_metadata_in_background(game_data["hash"], game_data["title"], platform=game_data.get("platform"))
 
@@ -1724,6 +1731,10 @@ class EmulatorHubWindow(QMainWindow):
             self.show_edit_game_details_dialog(game_data)
         elif action == act_fetch_igdb:
             self.statusBar().showMessage(f"Fetching metadata for '{game_data['title']}'...")
+            meta_ref = self.config_manager.config["game_metadata"].get(g_hash)
+            if meta_ref:
+                meta_ref["auto_fetch_disabled"] = False
+                self.config_manager.save_config()
             self.fetch_metadata_in_background(game_data["hash"], game_data["title"])
         elif action == act_manual_search:
             from ui_components import ManualIGDBSearchModal
@@ -1738,6 +1749,7 @@ class EmulatorHubWindow(QMainWindow):
                     meta_ref["developer"] = new_meta["developer"]
                     meta_ref["release_date"] = new_meta["release_date"]
                     meta_ref["summary"] = new_meta["summary"]
+                    meta_ref["auto_fetch_disabled"] = False
 
                     # Hot-patch games_data_map immediately so banner updates now
                     if g_hash in self.games_data_map:
@@ -1769,6 +1781,7 @@ class EmulatorHubWindow(QMainWindow):
                 meta_ref["developer"] = "Unknown Developer"
                 meta_ref["release_date"] = "N/A"
                 meta_ref["cover_image_id"] = ""
+                meta_ref["auto_fetch_disabled"] = True
                 cover_path = self.config_manager.covers_dir / f"{g_hash}.jpg"
                 if cover_path.exists():
                     try:
@@ -2285,7 +2298,7 @@ class EmulatorHubWindow(QMainWindow):
                 self.config_manager.config.setdefault("emulators", {})["RPCS3 (Auto-Detected)"] = {
                     "path": rpcs3_path,
                     "systems": ["PlayStation 3"],
-                    "args": "%ROM%"
+                    "args": ""
                 }
                 self.config_manager.save_config()
                 self.update_emulators_tree()
@@ -2344,23 +2357,20 @@ class EmulatorHubWindow(QMainWindow):
             if g_path.lower().startswith("steam://"):
                 os.startfile(g_path)
                 self.playtime_tracker.start_tracking(g_hash, 0, tracking_exe, game_dir)
-                self.currently_playing_hash = g_hash
-                self.banner.set_playing(True)
+                self._on_game_launched(g_hash)
                 self.statusBar().showMessage(f"Launched '{game_data['title']}' via Steam.")
                 
             elif g_path.lower().endswith(".lnk") or g_path.lower().endswith(".url"):
                 os.startfile(g_path)
                 self.playtime_tracker.start_tracking(g_hash, 0, tracking_exe, game_dir)
-                self.currently_playing_hash = g_hash
-                self.banner.set_playing(True)
+                self._on_game_launched(g_hash)
             
             elif tracking_exe and os.path.isfile(tracking_exe):
                 # Custom-added game with a selected executable — run the exe directly
                 exe_dir = os.path.dirname(tracking_exe)
                 proc = subprocess.Popen([tracking_exe], cwd=exe_dir if os.path.exists(exe_dir) else None)
                 self.playtime_tracker.start_tracking(g_hash, proc, tracking_exe, exe_dir)
-                self.currently_playing_hash = g_hash
-                self.banner.set_playing(True)
+                self._on_game_launched(g_hash)
                 
             elif os.path.isdir(g_path):
                 # Folder-based game without a tracking_exe — scan for exe and ask user
@@ -2420,18 +2430,22 @@ class EmulatorHubWindow(QMainWindow):
                 exe_dir = os.path.dirname(chosen_exe)
                 proc = subprocess.Popen([chosen_exe], cwd=exe_dir if os.path.exists(exe_dir) else None)
                 self.playtime_tracker.start_tracking(g_hash, proc, chosen_exe, exe_dir)
-                self.currently_playing_hash = g_hash
-                self.banner.set_playing(True)
+                self._on_game_launched(g_hash)
                 
             else:
                 dir_name = os.path.dirname(g_path)
                 proc = subprocess.Popen([g_path], cwd=dir_name if os.path.exists(dir_name) else None)
                 self.playtime_tracker.start_tracking(g_hash, proc, g_path, dir_name)
-                self.currently_playing_hash = g_hash
-                self.banner.set_playing(True)
+                self._on_game_launched(g_hash)
                 
         except Exception as e:
             QMessageBox.critical(self, "Launch Failed", f"Could not launch PC game: {e}")
+
+    def _on_game_launched(self, game_hash):
+        self.currently_playing_hash = game_hash
+        self.banner.set_playing(True)
+        # Minimize main window to save GPU/CPU resources during gameplay
+        self.showMinimized()
 
     def execute_emulator_process(self, game_hash, game_path, emu_config):
         self.mark_game_recently_played(game_hash)
@@ -2442,22 +2456,55 @@ class EmulatorHubWindow(QMainWindow):
         norm_emu = os.path.normpath(emu_path)
         norm_game = os.path.normpath(game_path)
         
+        # Hardcode fallback: shadPS4 QT launcher often swallows CLI args. Use core exe directly.
+        if "shadps4" in norm_emu.lower() and "launcher" in norm_emu.lower():
+            direct_exe = os.path.join(os.path.dirname(norm_emu), "shadPS4.exe")
+            if os.path.exists(direct_exe):
+                norm_emu = direct_exe
+                
         cmd = [norm_emu]
         if args:
-            if "%ROM%" in args:
-                formatted_args = args.replace("%ROM%", f'"{norm_game}"')
-                cmd.extend(shlex.split(formatted_args))
-            else:
-                cmd.extend(shlex.split(args))
+            # Split args first using posix=False to preserve backslashes
+            split_args = shlex.split(args, posix=False)
+            has_rom_token = False
+            
+            for arg in split_args:
+                # Remove surrounding quotes if shlex kept them
+                if arg.startswith('"') and arg.endswith('"'):
+                    arg = arg[1:-1]
+                elif arg.startswith("'") and arg.endswith("'"):
+                    arg = arg[1:-1]
+                    
+                if "%ROM%" in arg:
+                    cmd.append(arg.replace("%ROM%", norm_game))
+                    has_rom_token = True
+                else:
+                    cmd.append(arg)
+                    
+            if not has_rom_token:
                 cmd.append(norm_game)
         else:
             cmd.append(norm_game)
             
+        # Hardcode fallback logic for specific emulators
+        if "shadps4" in norm_emu.lower():
+            # If the user selected a directory for the game, launch using Title ID
+            if os.path.isdir(norm_game):
+                folder_name = os.path.basename(norm_game)
+                if cmd[-1] == norm_game:
+                    cmd[-1] = folder_name
+                if "-g" in cmd:
+                    cmd.remove("-g")
+            else:
+                # It's a direct file (e.g. .elf or .bin)
+                if "-g" not in cmd:
+                    cmd.insert(-1, "-g")
+            
         try:
-            proc = subprocess.Popen(cmd)
+            emu_dir = os.path.dirname(norm_emu)
+            proc = subprocess.Popen(cmd, cwd=emu_dir if os.path.exists(emu_dir) else None)
             self.playtime_tracker.start_tracking(game_hash, proc)
-            self.currently_playing_hash = game_hash
-            self.banner.set_playing(True)
+            self._on_game_launched(game_hash)
         except Exception as e:
             QMessageBox.critical(self, "Launch Emulator Failed", f"Could not start emulator process:\n{e}")
 
@@ -2476,6 +2523,11 @@ class EmulatorHubWindow(QMainWindow):
         self.banner.set_playing(False)
         self.load_game_cache()
         self.statusBar().showMessage("Play session recorded. Stats synced.", 5000)
+        
+        # Restore window if it was minimized
+        if self.isMinimized():
+            self.showNormal()
+            self.activateWindow()
 
     def stop_current_game(self):
         """Force-stop the currently tracked game process."""
@@ -2681,7 +2733,7 @@ class EmulatorHubWindow(QMainWindow):
                 "name": "RPCS3",
                 "exes": ["rpcs3.exe"],
                 "systems": ["PlayStation 3"],
-                "args": "%ROM%",
+                "args": "",
                 "subdirs": ["RPCS3"]
             },
             {
@@ -2721,9 +2773,9 @@ class EmulatorHubWindow(QMainWindow):
             },
             {
                 "name": "shadPS4",
-                "exes": ["shadPS4QTLauncher.exe", "shadPS4.exe"],
+                "exes": ["shadPS4.exe", "shadPS4QTLauncher.exe"],
                 "systems": ["PlayStation 4"],
-                "args": "%ROM%",
+                "args": "",
                 "subdirs": ["shadPS4", "shadps4", "shadps4-win64"]
             },
             {
@@ -3096,6 +3148,26 @@ class EmulatorHubWindow(QMainWindow):
             self.config_manager.save_config()
             self.update_emulators_tree()
             self.statusBar().showMessage(f"✅ Emulator '{new_name}' updated.", 4000)
+
+    def run_selected_emulator(self):
+        item = self.emu_tree.currentItem()
+        if not item:
+            return
+            
+        emu_name = item.text(0)
+        emu_config = self.config_manager.config.get("emulators", {}).get(emu_name)
+        if emu_config and "path" in emu_config:
+            emu_path = emu_config["path"]
+            if os.path.exists(emu_path):
+                import subprocess
+                try:
+                    subprocess.Popen([emu_path], cwd=os.path.dirname(emu_path))
+                except Exception as e:
+                    from PyQt6.QtWidgets import QMessageBox
+                    QMessageBox.critical(self, "Error", f"Failed to run emulator:\n{e}")
+            else:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "Not Found", f"Emulator executable not found at:\n{emu_path}")
 
     def remove_selected_emulator(self):
         item = self.emu_tree.currentItem()
