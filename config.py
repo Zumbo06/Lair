@@ -33,7 +33,8 @@ class ConfigManager:
             "platform_defaults": {},
             "igdb_client_id": "",
             "igdb_client_secret": "",
-            "auto_scan_on_startup": True
+            "auto_scan_on_startup": True,
+            "minimize_to_tray_on_launch": False
         }
         self.igdb_cache = {}
         self.load_config()

@@ -16,9 +16,9 @@ from PyQt6.QtWidgets import (
     QStatusBar, QListWidgetItem, QPushButton, QMessageBox, QFileDialog, QLabel,
     QDialog, QLineEdit, QDialogButtonBox, QSplitter, QComboBox, QTreeWidget,
     QTreeWidgetItem, QCheckBox, QFormLayout, QGroupBox, QStackedWidget, QFrame, QMenu,
-    QTextEdit
+    QTextEdit, QSystemTrayIcon
 )
-from PyQt6.QtGui import QFont, QIcon, QPixmap, QColor, QBrush, QPen, QPainter, QLinearGradient
+from PyQt6.QtGui import QFont, QIcon, QPixmap, QColor, QBrush, QPen, QPainter, QLinearGradient, QAction
 from PyQt6.QtCore import Qt, QSize, QRect, pyqtSignal, QTimer
 
 # --- Import Modular Subcomponents ---
@@ -79,6 +79,51 @@ class EmulatorHubWindow(QMainWindow):
         if self.config_manager.config.get("auto_scan_on_startup", True):
             QTimer.singleShot(1000, self.trigger_silent_pc_game_autoscan)
             QTimer.singleShot(2500, self._run_quick_rom_scan_startup)
+            
+        self.setup_tray()
+
+    def setup_tray(self):
+        self.tray_icon = QSystemTrayIcon(self)
+        
+        # Use gamepad icon
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "Gamepad.png")
+        if os.path.exists(icon_path):
+            self.tray_icon.setIcon(QIcon(icon_path))
+        else:
+            self.tray_icon.setIcon(QIcon())
+            
+        tray_menu = QMenu()
+        
+        show_action = QAction("Show EmulatorHub", self)
+        show_action.triggered.connect(self.showNormal)
+        tray_menu.addAction(show_action)
+        
+        quit_action = QAction("Quit", self)
+        quit_action.triggered.connect(QApplication.instance().quit)
+        tray_menu.addAction(quit_action)
+        
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.activated.connect(self._on_tray_activated)
+        self.tray_icon.show()
+        
+    def _on_tray_activated(self, reason):
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self.showNormal()
+            self.activateWindow()
+
+    def closeEvent(self, event):
+        self.config_manager.save_config()
+        if self.config_manager.config.get("minimize_to_tray_on_launch", False):
+            event.ignore()
+            self.hide()
+            self.tray_icon.showMessage(
+                "EmulatorHub",
+                "App minimized to tray. Right-click the icon to quit.",
+                QSystemTrayIcon.MessageIcon.Information,
+                2000
+            )
+        else:
+            event.accept()
 
     def setup_theme(self):
         # Deep premium Obsidian & Velvet Violet QSS stylesheet
@@ -777,6 +822,23 @@ class EmulatorHubWindow(QMainWindow):
         
         content_layout.addWidget(box_actions)
         
+        # 4. App Behavior Panel
+        box_behavior = QGroupBox("APPLICATION BEHAVIOR")
+        behavior_layout = QVBoxLayout(box_behavior)
+        behavior_layout.setContentsMargins(12, 20, 12, 12)
+        
+        self.chk_tray = QCheckBox("Minimize to system tray on close / game launch")
+        self.chk_tray.setChecked(self.config_manager.config.get("minimize_to_tray_on_launch", False))
+        self.chk_tray.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY}; font-weight: normal;")
+        
+        def save_behavior():
+            self.config_manager.config["minimize_to_tray_on_launch"] = self.chk_tray.isChecked()
+            self.config_manager.save_config()
+            
+        self.chk_tray.stateChanged.connect(save_behavior)
+        behavior_layout.addWidget(self.chk_tray)
+        content_layout.addWidget(box_behavior)
+        
         scroll.setWidget(content)
         layout.addWidget(scroll)
         return widget
@@ -1050,7 +1112,17 @@ class EmulatorHubWindow(QMainWindow):
             ".cue": "PlayStation",
             ".cso": "PSP",
             ".sfb": "PlayStation 3",
-            ".pkg": "PlayStation 4"
+            ".pkg": "PlayStation 4",
+            # Sega
+            ".md": "Sega Genesis",
+            ".gen": "Sega Genesis",
+            ".smd": "Sega Genesis",
+            ".32x": "Sega 32X",
+            ".cdi": "Sega Dreamcast",
+            ".gdi": "Sega Dreamcast",
+            ".sat": "Sega Saturn",
+            ".gg": "Game Gear",
+            ".sms": "Sega Master System",
         }
         
         roms_found = []
@@ -1300,11 +1372,21 @@ class EmulatorHubWindow(QMainWindow):
     # --- INTERACTION CONTROLLERS ---
     # =============================================================================
     def repopulate_sidebar_tree(self):
+        # Remember current sidebar selection so we can restore it after rebuild
+        prev_item = self.sidebar_tree.currentItem()
+        prev_role = prev_item.data(0, Qt.ItemDataRole.UserRole) if prev_item else None
+        
         self.sidebar_tree.clear()
+        icons_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
         
         # ALL GAMES root
-        all_item = QTreeWidgetItem([f"🎮  {Constants.ALL_GAMES_CATEGORY}"])
+        all_item = QTreeWidgetItem([f"  {Constants.ALL_GAMES_CATEGORY}"])
         all_item.setData(0, Qt.ItemDataRole.UserRole, Constants.ALL_GAMES_CATEGORY)
+        icon_path_gamepad = os.path.join(icons_dir, "Gamepad.png")
+        if os.path.exists(icon_path_gamepad):
+            all_item.setIcon(0, QIcon(icon_path_gamepad))
+        else:
+            all_item.setText(0, f"🎮  {Constants.ALL_GAMES_CATEGORY}")
         self.sidebar_tree.addTopLevelItem(all_item)
         
         # FAVORITES root
@@ -1313,8 +1395,13 @@ class EmulatorHubWindow(QMainWindow):
         self.sidebar_tree.addTopLevelItem(fav_item)
         
         # RECENTS root
-        recent_item = QTreeWidgetItem([f"⏱  {Constants.RECENTS_CATEGORY}"])
+        recent_item = QTreeWidgetItem([f"  {Constants.RECENTS_CATEGORY}"])
         recent_item.setData(0, Qt.ItemDataRole.UserRole, Constants.RECENTS_CATEGORY)
+        icon_path_clock = os.path.join(icons_dir, "clock.png")
+        if os.path.exists(icon_path_clock):
+            recent_item.setIcon(0, QIcon(icon_path_clock))
+        else:
+            recent_item.setText(0, f"⏱  {Constants.RECENTS_CATEGORY}")
         self.sidebar_tree.addTopLevelItem(recent_item)
         
         # Platforms root
@@ -1340,7 +1427,22 @@ class EmulatorHubWindow(QMainWindow):
             "Nintendo 64": (None, "nintendo.png"),
             "Game Boy": (None, "nintendo.png"),
             "Game Boy Color": (None, "nintendo.png"),
-            "Game Boy Advance": (None, "nintendo.png")
+            "Game Boy Advance": (None, "nintendo.png"),
+            # Sega consoles
+            "Sega Dreamcast": (None, "sega.png"),
+            "Dreamcast": (None, "sega.png"),
+            "Sega Genesis": (None, "sega.png"),
+            "Genesis": (None, "sega.png"),
+            "Mega Drive": (None, "sega.png"),
+            "Sega Mega Drive": (None, "sega.png"),
+            "Sega Saturn": (None, "sega.png"),
+            "Saturn": (None, "sega.png"),
+            "Sega CD": (None, "sega.png"),
+            "Sega 32X": (None, "sega.png"),
+            "Sega Master System": (None, "sega.png"),
+            "Master System": (None, "sega.png"),
+            "Game Gear": (None, "sega.png"),
+            "Sega Game Gear": (None, "sega.png"),
         }
         
         icons_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
@@ -1362,8 +1464,26 @@ class EmulatorHubWindow(QMainWindow):
         self.sidebar_tree.addTopLevelItem(plat_item)
         plat_item.setExpanded(False)
         
-        # Select first tab by default
-        self.sidebar_tree.setCurrentItem(all_item)
+        # Restore previous selection, or default to All Games on first load
+        restored = False
+        if prev_role:
+            for i in range(self.sidebar_tree.topLevelItemCount()):
+                top = self.sidebar_tree.topLevelItem(i)
+                if top.data(0, Qt.ItemDataRole.UserRole) == prev_role:
+                    self.sidebar_tree.setCurrentItem(top)
+                    restored = True
+                    break
+                # Check children (platform nodes)
+                for j in range(top.childCount()):
+                    child = top.child(j)
+                    if child.data(0, Qt.ItemDataRole.UserRole) == prev_role:
+                        self.sidebar_tree.setCurrentItem(child)
+                        restored = True
+                        break
+                if restored:
+                    break
+        if not restored:
+            self.sidebar_tree.setCurrentItem(all_item)
 
     def set_view_grid(self):
         self.btn_grid.setChecked(True)
@@ -1428,11 +1548,13 @@ class EmulatorHubWindow(QMainWindow):
             games_subset = [g for g in self.games_data_map.values() if g["hash"] in favs]
         elif filter_mode == Constants.RECENTS_CATEGORY:
             recents = self.config_manager.config.get("recently_played", [])
-            # Preserve order
+            # Preserve order, and only include games that have actually been played
             games_subset = []
             for g_hash in recents:
                 if g_hash in self.games_data_map:
-                    games_subset.append(self.games_data_map[g_hash])
+                    game = self.games_data_map[g_hash]
+                    if game.get("playtime", 0) > 0:
+                        games_subset.append(game)
         elif filter_mode == "PLATFORM":
             games_subset = self.games_by_platform.get(filter_val, [])
             
@@ -2445,7 +2567,16 @@ class EmulatorHubWindow(QMainWindow):
         self.currently_playing_hash = game_hash
         self.banner.set_playing(True)
         # Minimize main window to save GPU/CPU resources during gameplay
-        self.showMinimized()
+        if self.config_manager.config.get("minimize_to_tray_on_launch", False):
+            self.hide()
+            self.tray_icon.showMessage(
+                "EmulatorHub",
+                "App minimized to tray while game is running.",
+                QSystemTrayIcon.MessageIcon.Information,
+                2000
+            )
+        else:
+            self.showMinimized()
 
     def execute_emulator_process(self, game_hash, game_path, emu_config):
         self.mark_game_recently_played(game_hash)
@@ -2524,8 +2655,8 @@ class EmulatorHubWindow(QMainWindow):
         self.load_game_cache()
         self.statusBar().showMessage("Play session recorded. Stats synced.", 5000)
         
-        # Restore window if it was minimized
-        if self.isMinimized():
+        # Restore window if it was minimized or hidden to tray
+        if self.isMinimized() or self.isHidden():
             self.showNormal()
             self.activateWindow()
 
@@ -2613,7 +2744,11 @@ class EmulatorHubWindow(QMainWindow):
                 ".nds": "Nintendo DS", ".3ds": "Nintendo 3DS", ".nes": "NES",
                 ".sfc": "Super Nintendo", ".z64": "Nintendo 64", ".chd": "PlayStation",
                 ".cue": "PlayStation", ".cso": "PSP", ".sfb": "PlayStation 3",
-                ".pkg": "PlayStation 4"
+                ".pkg": "PlayStation 4",
+                # Sega
+                ".md": "Sega Genesis", ".gen": "Sega Genesis", ".smd": "Sega Genesis",
+                ".32x": "Sega 32X", ".cdi": "Sega Dreamcast", ".gdi": "Sega Dreamcast",
+                ".sat": "Sega Saturn", ".gg": "Game Gear", ".sms": "Sega Master System",
             }
             
             for path in self.config_manager.config["game_library_paths"]:
@@ -3247,9 +3382,7 @@ class EmulatorHubWindow(QMainWindow):
             self.config_manager
         )
 
-    def closeEvent(self, event):
-        self.config_manager.save_config()
-        event.accept()
+
 
 # =============================================================================
 # --- MAIN APPLICATION BLOCK ---
@@ -3257,6 +3390,7 @@ class EmulatorHubWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)  # Allow minimizing to tray without quitting
     app.setFont(QFont("Segoe UI", 9))
     
     config_obj = ConfigManager()

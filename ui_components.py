@@ -968,8 +968,13 @@ class StatsDashboard(QWidget):
         icon_layout.setContentsMargins(0, 0, 0, 0)
         icon_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        icon_label = QLabel(icon)
-        icon_label.setFont(QFont("Segoe UI Emoji", 20))
+        icon_label = QLabel()
+        if len(icon) > 5 and (icon.endswith(".png") or icon.endswith(".jpg")):
+            pixmap = QPixmap(icon)
+            icon_label.setPixmap(pixmap.scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        else:
+            icon_label.setText(icon)
+            icon_label.setFont(QFont("Segoe UI Emoji", 20))
         icon_label.setStyleSheet("background: transparent;")
         icon_layout.addWidget(icon_label)
         
@@ -1438,9 +1443,18 @@ class StatsDashboard(QWidget):
         recent_plays.sort(key=lambda x: x[1], reverse=True)
         top_recent = recent_plays[:5]
         
+        import os
+        clock_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "clock.png")
+        if not os.path.exists(clock_icon):
+            clock_icon = "⏱"
+        
+        gamepad_icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons", "Gamepad.png")
+        if not os.path.exists(gamepad_icon):
+            gamepad_icon = "🎮"
+
         self.cards_grid.addWidget(self.create_summary_card("TOTAL GAMES", f"{total_games} games", "📁", Constants.C_ACCENT_CYAN), 0, 0)
-        self.cards_grid.addWidget(self.create_summary_card("TOTAL PLAYTIME", f"{total_playtime_h:.1f} hrs", "⏱", Constants.C_ACCENT_VIOLET), 0, 1)
-        self.cards_grid.addWidget(self.create_summary_card("FAVORITE PLATFORM", favorite_system, "🎮", Constants.C_SUCCESS), 0, 2)
+        self.cards_grid.addWidget(self.create_summary_card("TOTAL PLAYTIME", f"{total_playtime_h:.1f} hrs", clock_icon, Constants.C_ACCENT_VIOLET), 0, 1)
+        self.cards_grid.addWidget(self.create_summary_card("FAVORITE PLATFORM", favorite_system, gamepad_icon, Constants.C_SUCCESS), 0, 2)
         self.cards_grid.addWidget(self.create_summary_card("ACTIVE SESSIONS", f"{total_sessions} sessions", "📈", Constants.C_WARNING), 0, 3)
         
         self.columns_layout.addWidget(self.create_ranking_column("THIS WEEK", week_stats, game_lookup))
