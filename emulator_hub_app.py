@@ -367,20 +367,34 @@ class EmulatorHubWindow(QMainWindow):
             border-right: 1.5px solid {Constants.C_BORDER};
         """)
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(16, 24, 16, 16)
-        sidebar_layout.setSpacing(16)
+        sidebar_layout.setContentsMargins(14, 20, 14, 16)
+        sidebar_layout.setSpacing(12)
+        
+        # Sidebar header with title and separator
+        sidebar_header = QWidget()
+        sidebar_header.setStyleSheet("background: transparent;")
+        sh_layout = QVBoxLayout(sidebar_header)
+        sh_layout.setContentsMargins(2, 0, 2, 0)
+        sh_layout.setSpacing(8)
         
         sidebar_title = QLabel("MY LIBRARY")
-        sidebar_title.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        sidebar_title.setStyleSheet(f"color: {Constants.C_TEXT_MUTED}; letter-spacing: 1.5px; border: none; background-color: transparent;")
-        sidebar_layout.addWidget(sidebar_title)
+        sidebar_title.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        sidebar_title.setStyleSheet(f"color: {Constants.C_TEXT_MUTED}; letter-spacing: 2px; border: none; background-color: transparent;")
+        sh_layout.addWidget(sidebar_title)
+        
+        sep_line = QFrame()
+        sep_line.setFrameShape(QFrame.Shape.HLine)
+        sep_line.setStyleSheet(f"background-color: {Constants.C_BORDER}; border: none; max-height: 1px;")
+        sep_line.setFixedHeight(1)
+        sh_layout.addWidget(sep_line)
+        sidebar_layout.addWidget(sidebar_header)
         
         self.sidebar_tree = QTreeWidget()
         self.sidebar_tree.setHeaderHidden(True)
         self.sidebar_tree.setIndentation(14)
         self.sidebar_tree.setAnimated(True)
         self.sidebar_tree.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.sidebar_tree.setIconSize(QSize(22, 22))
+        self.sidebar_tree.setIconSize(QSize(20, 20))
         self.sidebar_tree.setStyleSheet(f"""
             QTreeWidget {{
                 background-color: transparent;
@@ -391,17 +405,21 @@ class EmulatorHubWindow(QMainWindow):
                 outline: 0;
             }}
             QTreeWidget::item {{
-                padding: 8px 6px;
-                margin: 2px 0px;
-                border-radius: 6px;
+                padding: 9px 6px;
+                margin: 1px 0px;
+                border-radius: 8px;
             }}
             QTreeWidget::item:hover {{
-                background-color: rgba(0, 229, 255, 0.15);
+                background-color: rgba(255, 255, 255, 0.05);
+                color: #ffffff;
             }}
             QTreeWidget::item:selected {{
-                background-color: {Constants.C_ACCENT_CYAN};
-                color: #000000;
-                border-left: 4px solid #ffffff;
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 rgba(140, 82, 255, 0.25), stop:1 rgba(0, 229, 255, 0.12));
+                color: {Constants.C_ACCENT_CYAN};
+                border-left: 3px solid {Constants.C_ACCENT_CYAN};
+                border-radius: 8px;
+                font-weight: bold;
             }}
             QTreeView::branch:has-children:!has-siblings:closed,
             QTreeView::branch:closed:has-children:has-siblings {{
@@ -416,6 +434,7 @@ class EmulatorHubWindow(QMainWindow):
         """)
         self.sidebar_tree.itemClicked.connect(self.on_sidebar_item_clicked)
         sidebar_layout.addWidget(self.sidebar_tree)
+
         
         splitter.addWidget(sidebar)
         
@@ -863,6 +882,8 @@ class EmulatorHubWindow(QMainWindow):
                 "developer": game.get("developer", "Unknown Developer"),
                 "release_date": game.get("release_date", "N/A"),
                 "summary": game.get("summary", ""),
+                "igdb_score": game.get("igdb_score"),
+                "igdb_rating_count": game.get("igdb_rating_count", 0),
                 "tracking_exe": game.get("tracking_exe", ""),
                 "game_dir": game.get("game_dir", ""),
                 "auto_fetch_disabled": game.get("auto_fetch_disabled", False)
@@ -1114,9 +1135,6 @@ class EmulatorHubWindow(QMainWindow):
             ".sfb": "PlayStation 3",
             ".pkg": "PlayStation 4",
             # Sega
-            ".md": "Sega Genesis",
-            ".gen": "Sega Genesis",
-            ".smd": "Sega Genesis",
             ".32x": "Sega 32X",
             ".cdi": "Sega Dreamcast",
             ".gdi": "Sega Dreamcast",
@@ -1174,21 +1192,23 @@ class EmulatorHubWindow(QMainWindow):
                     # Prune recursion into sce_sys
                     dirs.remove(sce_sys_dir)
                     
-                # 2. File suffix scanning
+                # 2. File-based ROM scan
                 for f in files:
                     file_path = Path(root) / f
                     suffix = file_path.suffix.lower()
-                    if suffix in PLATFORM_SUFFIXES:
-                        platform = PLATFORM_SUFFIXES[suffix]
-                        # Avoid duplicates for PS3 disc file if folder was scanned
-                        if platform == "PlayStation 3" and file_path.name.upper() == "PS3_DISC.SFB":
-                            continue
-                        roms_found.append({
-                            "title": file_path.stem,
-                            "path": str(file_path),
-                            "platform": platform,
-                            "size": file_path.stat().st_size
-                        })
+                    if suffix not in PLATFORM_SUFFIXES:
+                        continue
+                    
+                    platform = PLATFORM_SUFFIXES[suffix]
+                    # Avoid duplicates for PS3 disc file if folder was already scanned
+                    if platform == "PlayStation 3" and file_path.name.upper() == "PS3_DISC.SFB":
+                        continue
+                    roms_found.append({
+                        "title": file_path.stem,
+                        "path": str(file_path),
+                        "platform": platform,
+                        "size": file_path.stat().st_size
+                    })
                         
         # 3. Automatically locate and scan RPCS3 dev_hdd0/game folder if RPCS3 is configured!
         rpcs3_game_dirs = []
@@ -1682,6 +1702,8 @@ class EmulatorHubWindow(QMainWindow):
                         meta["developer"] = details["developer"]
                         meta["release_date"] = details["release_date"]
                         meta["summary"] = details["summary"]
+                        meta["igdb_score"] = details.get("igdb_score")
+                        meta["igdb_rating_count"] = details.get("igdb_rating_count", 0)
 
                         # Download cover inline (same thread) to avoid spawning another thread
                         if details["cover_image_id"]:
@@ -1715,6 +1737,8 @@ class EmulatorHubWindow(QMainWindow):
             gd["developer"] = meta.get("developer", gd["developer"])
             gd["release_date"] = meta.get("release_date", gd["release_date"])
             gd["summary"] = meta.get("summary", gd["summary"])
+            gd["igdb_score"] = meta.get("igdb_score", gd.get("igdb_score"))
+            gd["igdb_rating_count"] = meta.get("igdb_rating_count", gd.get("igdb_rating_count", 0))
 
         # 2. If this game is currently shown in the banner, refresh it immediately
         selected = self.games_list.currentItem()
@@ -2746,7 +2770,6 @@ class EmulatorHubWindow(QMainWindow):
                 ".cue": "PlayStation", ".cso": "PSP", ".sfb": "PlayStation 3",
                 ".pkg": "PlayStation 4",
                 # Sega
-                ".md": "Sega Genesis", ".gen": "Sega Genesis", ".smd": "Sega Genesis",
                 ".32x": "Sega 32X", ".cdi": "Sega Dreamcast", ".gdi": "Sega Dreamcast",
                 ".sat": "Sega Saturn", ".gg": "Game Gear", ".sms": "Sega Master System",
             }
@@ -2801,21 +2824,23 @@ class EmulatorHubWindow(QMainWindow):
                     for f in files:
                         file_path = Path(root) / f
                         suffix = file_path.suffix.lower()
-                        if suffix in PLATFORM_SUFFIXES:
-                            platform = PLATFORM_SUFFIXES[suffix]
-                            if platform == "PlayStation 3" and file_path.name.upper() == "PS3_DISC.SFB":
-                                continue
-                            target_path = str(file_path)
-                            g_hash = hashlib.md5(target_path.encode('utf-8')).hexdigest()
-                            if g_hash not in self.config_manager.config["game_metadata"]:
-                                self.config_manager.config["game_metadata"][g_hash] = {
-                                    "title": file_path.stem, "path": target_path,
-                                    "platform": platform, "playtime": 0, "sessions": [],
-                                    "developer": "Unknown Developer", "release_date": "N/A",
-                                    "summary": f"Local ROM for {platform}", "cover_image_id": "",
-                                    "size": file_path.stat().st_size
-                                }
-                                new_count += 1
+                        if suffix not in PLATFORM_SUFFIXES:
+                            continue
+                        platform = PLATFORM_SUFFIXES[suffix]
+                        if platform == "PlayStation 3" and file_path.name.upper() == "PS3_DISC.SFB":
+                            continue
+                        target_path = str(file_path)
+                        g_hash = hashlib.md5(target_path.encode('utf-8')).hexdigest()
+                        if g_hash not in self.config_manager.config["game_metadata"]:
+                            self.config_manager.config["game_metadata"][g_hash] = {
+                                "title": file_path.stem, "path": target_path,
+                                "platform": platform, "playtime": 0, "sessions": [],
+                                "developer": "Unknown Developer", "release_date": "N/A",
+                                "summary": f"Local ROM for {platform}", "cover_image_id": "",
+                                "size": file_path.stat().st_size
+                            }
+                            new_count += 1
+
             
             if new_count > 0:
                 self.config_manager.save_config()

@@ -111,6 +111,15 @@ class IGDBClient:
         "Xbox": [11, 12, 49, 169],    # Xbox, Xbox 360, Xbox One, Xbox Series
     }
 
+    @staticmethod
+    def _extract_igdb_score(game_data):
+        """Return the most useful IGDB 0-100 score for display."""
+        for key in ("aggregated_rating", "total_rating", "rating"):
+            value = game_data.get(key)
+            if isinstance(value, (int, float)) and value > 0:
+                return round(float(value), 1)
+        return None
+
     def fetch_game_details(self, title, platform=None):
         if not requests:
             return None
@@ -166,7 +175,7 @@ class IGDBClient:
             where_clauses.append(f"platforms = ({plat_str})")
         
         where_str = " & ".join(where_clauses)
-        body = f'search "{escaped_title}"; fields name, cover.image_id, involved_companies.company.name, involved_companies.developer, first_release_date, summary, genres.name, category; where {where_str}; limit 5;'
+        body = f'search "{escaped_title}"; fields name, cover.image_id, involved_companies.company.name, involved_companies.developer, first_release_date, summary, genres.name, category, rating, rating_count, aggregated_rating, aggregated_rating_count, total_rating, total_rating_count; where {where_str}; limit 5;'
         
         try:
             response = self._session.post(url, headers=headers, data=body, timeout=8)
@@ -175,7 +184,7 @@ class IGDBClient:
                 
                 # If platform filter returned no results, retry without platform filter
                 if (not results or len(results) == 0) and platform and platform in self.IGDB_PLATFORM_IDS:
-                    body_fallback = f'search "{escaped_title}"; fields name, cover.image_id, involved_companies.company.name, involved_companies.developer, first_release_date, summary, genres.name, category; where category = 0; limit 5;'
+                    body_fallback = f'search "{escaped_title}"; fields name, cover.image_id, involved_companies.company.name, involved_companies.developer, first_release_date, summary, genres.name, category, rating, rating_count, aggregated_rating, aggregated_rating_count, total_rating, total_rating_count; where category = 0; limit 5;'
                     response = self._session.post(url, headers=headers, data=body_fallback, timeout=8)
                     if response.status_code == 200:
                         results = response.json()
@@ -230,13 +239,21 @@ class IGDBClient:
                     if isinstance(cover_data, dict):
                         cover_id = cover_data.get("image_id", "")
                     
+                    igdb_score = self._extract_igdb_score(game_data)
+                    
                     details = {
                         "name": game_data.get("name", clean_title),
                         "cover_image_id": cover_id,
                         "developer": developer,
                         "release_date": release_date,
                         "summary": game_data.get("summary", "No description available."),
-                        "genres": genres
+                        "genres": genres,
+                        "igdb_score": igdb_score,
+                        "igdb_rating_count": game_data.get("rating_count", 0),
+                        "igdb_aggregated_rating": game_data.get("aggregated_rating"),
+                        "igdb_aggregated_rating_count": game_data.get("aggregated_rating_count", 0),
+                        "igdb_total_rating": game_data.get("total_rating"),
+                        "igdb_total_rating_count": game_data.get("total_rating_count", 0)
                     }
                     
                     # Store in cache (batch-save later, not per-game)
@@ -289,7 +306,8 @@ class IGDBClient:
             f'search "{escaped_title}"; '
             f'fields name, cover.image_id, involved_companies.company.name, '
             f'involved_companies.developer, first_release_date, summary, '
-            f'genres.name, category, platforms.name; '
+            f'genres.name, category, platforms.name, rating, rating_count, '
+            f'aggregated_rating, aggregated_rating_count, total_rating, total_rating_count; '
             f'limit 20;'
         )
 
@@ -348,6 +366,12 @@ class IGDBClient:
                             "platforms_str": plat_str,
                             "category_id": cat_id,
                             "category_name": cat_name,
+                            "igdb_score": self._extract_igdb_score(game_data),
+                            "igdb_rating_count": game_data.get("rating_count", 0),
+                            "igdb_aggregated_rating": game_data.get("aggregated_rating"),
+                            "igdb_aggregated_rating_count": game_data.get("aggregated_rating_count", 0),
+                            "igdb_total_rating": game_data.get("total_rating"),
+                            "igdb_total_rating_count": game_data.get("total_rating_count", 0),
                         })
             else:
                 print(f"[IGDB Manual Search] Error response: {response.text}")
