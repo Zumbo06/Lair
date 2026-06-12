@@ -361,32 +361,34 @@ class EmulatorHubWindow(QMainWindow):
         
         # --- Left Category Sidebar ---
         sidebar = QWidget()
-        sidebar.setFixedWidth(260)
+        sidebar.setFixedWidth(286)
         sidebar.setStyleSheet(f"""
             background-color: {Constants.C_BG_PANEL};
             border-right: 1.5px solid {Constants.C_BORDER};
         """)
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(14, 20, 14, 16)
-        sidebar_layout.setSpacing(12)
+        sidebar_layout.setContentsMargins(18, 20, 18, 18)
+        sidebar_layout.setSpacing(14)
         
-        # Sidebar header with title and separator
-        sidebar_header = QWidget()
-        sidebar_header.setStyleSheet("background: transparent;")
-        sh_layout = QVBoxLayout(sidebar_header)
-        sh_layout.setContentsMargins(2, 0, 2, 0)
-        sh_layout.setSpacing(8)
+        sidebar_header = QFrame()
+        sidebar_header.setFixedHeight(72)
+        sidebar_header.setStyleSheet(f"""
+            background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(140, 82, 255, 0.16), stop:1 rgba(0, 229, 255, 0.08));
+            border: 1px solid {Constants.C_BORDER};
+            border-radius: 14px;
+        """)
+        header_layout = QVBoxLayout(sidebar_header)
+        header_layout.setContentsMargins(14, 10, 14, 8)
+        header_layout.setSpacing(4)
         
-        sidebar_title = QLabel("MY LIBRARY")
-        sidebar_title.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
-        sidebar_title.setStyleSheet(f"color: {Constants.C_TEXT_MUTED}; letter-spacing: 2px; border: none; background-color: transparent;")
-        sh_layout.addWidget(sidebar_title)
-        
-        sep_line = QFrame()
-        sep_line.setFrameShape(QFrame.Shape.HLine)
-        sep_line.setStyleSheet(f"background-color: {Constants.C_BORDER}; border: none; max-height: 1px;")
-        sep_line.setFixedHeight(1)
-        sh_layout.addWidget(sep_line)
+        sidebar_title = QLabel("LIBRARY")
+        sidebar_title.setFont(QFont("Segoe UI", 14, QFont.Weight.ExtraBold))
+        sidebar_title.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY}; letter-spacing: 1.5px;")
+        sidebar_subtitle = QLabel("Browse, filter, and organize your collection")
+        sidebar_subtitle.setFont(QFont("Segoe UI", 8, QFont.Weight.Normal))
+        sidebar_subtitle.setStyleSheet(f"color: {Constants.C_TEXT_MUTED};")
+        header_layout.addWidget(sidebar_title)
+        header_layout.addWidget(sidebar_subtitle)
         sidebar_layout.addWidget(sidebar_header)
         
         self.sidebar_tree = QTreeWidget()
@@ -394,7 +396,7 @@ class EmulatorHubWindow(QMainWindow):
         self.sidebar_tree.setIndentation(14)
         self.sidebar_tree.setAnimated(True)
         self.sidebar_tree.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.sidebar_tree.setIconSize(QSize(20, 20))
+        self.sidebar_tree.setIconSize(QSize(22, 22))
         self.sidebar_tree.setStyleSheet(f"""
             QTreeWidget {{
                 background-color: transparent;
@@ -405,20 +407,20 @@ class EmulatorHubWindow(QMainWindow):
                 outline: 0;
             }}
             QTreeWidget::item {{
-                padding: 9px 6px;
-                margin: 1px 0px;
-                border-radius: 8px;
+                padding: 9px 8px;
+                margin: 3px 0px;
+                border-radius: 9px;
+                border: 1px solid transparent;
+                background-color: transparent;
             }}
             QTreeWidget::item:hover {{
-                background-color: rgba(255, 255, 255, 0.05);
-                color: #ffffff;
+                background-color: rgba(0, 229, 255, 0.10);
+                border-color: rgba(0, 229, 255, 0.16);
             }}
             QTreeWidget::item:selected {{
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 rgba(140, 82, 255, 0.25), stop:1 rgba(0, 229, 255, 0.12));
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(0, 229, 255, 0.20), stop:1 rgba(140, 82, 255, 0.20));
                 color: {Constants.C_ACCENT_CYAN};
-                border-left: 3px solid {Constants.C_ACCENT_CYAN};
-                border-radius: 8px;
+                border-color: rgba(0, 229, 255, 0.22);
                 font-weight: bold;
             }}
             QTreeView::branch:has-children:!has-siblings:closed,
@@ -434,7 +436,6 @@ class EmulatorHubWindow(QMainWindow):
         """)
         self.sidebar_tree.itemClicked.connect(self.on_sidebar_item_clicked)
         sidebar_layout.addWidget(self.sidebar_tree)
-
         
         splitter.addWidget(sidebar)
         
@@ -865,13 +866,78 @@ class EmulatorHubWindow(QMainWindow):
     # =============================================================================
     # --- LOGICAL CORE REDESIGNS ---
     # =============================================================================
+    @staticmethod
+    def _calculate_folder_size(folder_path):
+        """Walk a directory tree and return total size in bytes."""
+        total = 0
+        try:
+            for dirpath, dirnames, filenames in os.walk(folder_path):
+                for fn in filenames:
+                    fp = os.path.join(dirpath, fn)
+                    try:
+                        total += os.path.getsize(fp)
+                    except OSError:
+                        pass
+        except OSError:
+            pass
+        return total
+
+    def _calculate_missing_sizes_worker(self):
+        """Background worker that calculates folder sizes for games with size=0."""
+        try:
+            updated = False
+            metadata_map = self.config_manager.config.get("game_metadata", {})
+            for g_hash, game in list(metadata_map.items()):
+                if game.get("size", 0) > 0:
+                    continue
+                # Determine the best folder or file to measure
+                game_dir = game.get("game_dir", "")
+                game_path = game.get("path", "")
+                computed_size = 0
+                if game_dir and os.path.isdir(game_dir):
+                    computed_size = self._calculate_folder_size(game_dir)
+                elif game_path and os.path.isdir(game_path):
+                    computed_size = self._calculate_folder_size(game_path)
+                elif game_path and os.path.isfile(game_path):
+                    try:
+                        computed_size = os.path.getsize(game_path)
+                    except OSError:
+                        pass
+                if computed_size > 0:
+                    game["size"] = computed_size
+                    updated = True
+            if updated:
+                self.config_manager.save_config()
+                from PyQt6.QtCore import QMetaObject
+                QMetaObject.invokeMethod(self, "_apply_calculated_sizes", Qt.ConnectionType.QueuedConnection)
+        except Exception as e:
+            print(f"Error calculating game sizes: {e}")
+
+    def _apply_calculated_sizes(self):
+        """Update in-memory game data map with newly calculated sizes (called on main thread)."""
+        metadata_map = self.config_manager.config.get("game_metadata", {})
+        changed = False
+        for g_hash, cached in self.games_data_map.items():
+            meta = metadata_map.get(g_hash)
+            if meta and meta.get("size", 0) > 0 and cached.get("size", 0) == 0:
+                cached["size"] = meta["size"]
+                changed = True
+        if changed:
+            self.repopulate_game_list()
+
     def load_game_cache(self):
         # Read from configuration data map
         self.games_data_map.clear()
         metadata_map = self.config_manager.config.get("game_metadata", {})
         
+        has_missing_sizes = False
         for g_hash, game in metadata_map.items():
             # Hydrate game properties
+            # Compute last played timestamp from sessions
+            sessions = game.get("sessions", [])
+            last_played_ts = 0
+            if sessions:
+                last_played_ts = max(s.get("timestamp", 0) for s in sessions)
             self.games_data_map[g_hash] = {
                 "title": game.get("title", ""),
                 "path": game.get("path", ""),
@@ -879,20 +945,28 @@ class EmulatorHubWindow(QMainWindow):
                 "platform": game.get("platform", ""),
                 "size": game.get("size", 0),
                 "playtime": game.get("playtime", 0),
+                "last_played": last_played_ts,
                 "developer": game.get("developer", "Unknown Developer"),
                 "release_date": game.get("release_date", "N/A"),
                 "summary": game.get("summary", ""),
+                "genres": game.get("genres", []),
                 "igdb_score": game.get("igdb_score"),
                 "igdb_rating_count": game.get("igdb_rating_count", 0),
                 "tracking_exe": game.get("tracking_exe", ""),
                 "game_dir": game.get("game_dir", ""),
                 "auto_fetch_disabled": game.get("auto_fetch_disabled", False)
             }
+            if game.get("size", 0) == 0:
+                has_missing_sizes = True
             
         self.rebuild_platform_mappings()
         self.repopulate_sidebar_tree()
         self.repopulate_game_list()
         self.update_emulators_tree()
+        
+        # Lazily calculate missing game sizes in background
+        if has_missing_sizes:
+            threading.Thread(target=self._calculate_missing_sizes_worker, daemon=True).start()
 
     def rebuild_platform_mappings(self):
         self.games_by_platform.clear()
@@ -945,12 +1019,16 @@ class EmulatorHubWindow(QMainWindow):
                         rel = "N/A"
                         summary = "Local PC Game"
                         cover_id = ""
+                        score = None
+                        score_count = 0
                         
                         if details:
                             dev = details["developer"]
                             rel = details["release_date"]
                             summary = details["summary"]
                             cover_id = details["cover_image_id"]
+                            score = details.get("igdb_score")
+                            score_count = details.get("igdb_rating_count", 0)
                             
                         self.config_manager.config["game_metadata"][ghash] = {
                             "title": pg["title"],
@@ -962,6 +1040,8 @@ class EmulatorHubWindow(QMainWindow):
                             "release_date": rel,
                             "summary": summary,
                             "cover_image_id": cover_id,
+                            "igdb_score": score,
+                            "igdb_rating_count": score_count,
                             "tracking_exe": pg.get("tracking_exe", ""),
                             "game_dir": pg.get("game_dir", ""),
                             "size": 0
@@ -1030,12 +1110,16 @@ class EmulatorHubWindow(QMainWindow):
                         rel = "N/A"
                         summary = "Local PC Game"
                         cover_id = ""
+                        score = None
+                        score_count = 0
                         
                         if details:
                             dev = details["developer"]
                             rel = details["release_date"]
                             summary = details["summary"]
                             cover_id = details["cover_image_id"]
+                            score = details.get("igdb_score")
+                            score_count = details.get("igdb_rating_count", 0)
                             
                         self.config_manager.config["game_metadata"][ghash] = {
                             "title": pg["title"],
@@ -1047,6 +1131,8 @@ class EmulatorHubWindow(QMainWindow):
                             "release_date": rel,
                             "summary": summary,
                             "cover_image_id": cover_id,
+                            "igdb_score": score,
+                            "igdb_rating_count": score_count,
                             "tracking_exe": pg.get("tracking_exe", ""),
                             "game_dir": pg.get("game_dir", ""),
                             "size": 0
@@ -1192,23 +1278,21 @@ class EmulatorHubWindow(QMainWindow):
                     # Prune recursion into sce_sys
                     dirs.remove(sce_sys_dir)
                     
-                # 2. File-based ROM scan
+                # 2. File suffix scanning
                 for f in files:
                     file_path = Path(root) / f
                     suffix = file_path.suffix.lower()
-                    if suffix not in PLATFORM_SUFFIXES:
-                        continue
-                    
-                    platform = PLATFORM_SUFFIXES[suffix]
-                    # Avoid duplicates for PS3 disc file if folder was already scanned
-                    if platform == "PlayStation 3" and file_path.name.upper() == "PS3_DISC.SFB":
-                        continue
-                    roms_found.append({
-                        "title": file_path.stem,
-                        "path": str(file_path),
-                        "platform": platform,
-                        "size": file_path.stat().st_size
-                    })
+                    if suffix in PLATFORM_SUFFIXES:
+                        platform = PLATFORM_SUFFIXES[suffix]
+                        # Avoid duplicates for PS3 disc file if folder was scanned
+                        if platform == "PlayStation 3" and file_path.name.upper() == "PS3_DISC.SFB":
+                            continue
+                        roms_found.append({
+                            "title": file_path.stem,
+                            "path": str(file_path),
+                            "platform": platform,
+                            "size": file_path.stat().st_size
+                        })
                         
         # 3. Automatically locate and scan RPCS3 dev_hdd0/game folder if RPCS3 is configured!
         rpcs3_game_dirs = []
@@ -1351,12 +1435,16 @@ class EmulatorHubWindow(QMainWindow):
                     rel = "N/A"
                     summary = f"Local ROM for {r['platform']}"
                     cover_id = ""
+                    score = None
+                    score_count = 0
                     
                     if details:
                         dev = details["developer"]
                         rel = details["release_date"]
                         summary = details["summary"]
                         cover_id = details["cover_image_id"]
+                        score = details.get("igdb_score")
+                        score_count = details.get("igdb_rating_count", 0)
                         
                     self.config_manager.config["game_metadata"][ghash] = {
                         "title": r["title"],
@@ -1368,6 +1456,8 @@ class EmulatorHubWindow(QMainWindow):
                         "release_date": rel,
                         "summary": summary,
                         "cover_image_id": cover_id,
+                        "igdb_score": score,
+                        "igdb_rating_count": score_count,
                         "size": r["size"]
                     }
                     
@@ -1895,6 +1985,8 @@ class EmulatorHubWindow(QMainWindow):
                     meta_ref["developer"] = new_meta["developer"]
                     meta_ref["release_date"] = new_meta["release_date"]
                     meta_ref["summary"] = new_meta["summary"]
+                    meta_ref["igdb_score"] = new_meta.get("igdb_score")
+                    meta_ref["igdb_rating_count"] = new_meta.get("igdb_rating_count", 0)
                     meta_ref["auto_fetch_disabled"] = False
 
                     # Hot-patch games_data_map immediately so banner updates now
@@ -1904,6 +1996,8 @@ class EmulatorHubWindow(QMainWindow):
                         gd["developer"] = new_meta["developer"]
                         gd["release_date"] = new_meta["release_date"]
                         gd["summary"] = new_meta["summary"]
+                        gd["igdb_score"] = new_meta.get("igdb_score")
+                        gd["igdb_rating_count"] = new_meta.get("igdb_rating_count", 0)
 
                     self.config_manager.save_config()
 
@@ -2317,6 +2411,8 @@ class EmulatorHubWindow(QMainWindow):
             rel = "N/A"
             summary = f"Custom added {platform} game"
             cover_id = ""
+            score = None
+            score_count = 0
             
             if self.igdb_client.is_configured():
                 details = self.igdb_client.fetch_game_details(title, platform=platform)
@@ -2325,17 +2421,18 @@ class EmulatorHubWindow(QMainWindow):
                     rel = details["release_date"]
                     summary = details["summary"]
                     cover_id = details["cover_image_id"]
+                    score = details.get("igdb_score")
+                    score_count = details.get("igdb_rating_count", 0)
             
-            # Calculate size
+            # Calculate size — prefer game_dir (installation folder) over single file
             game_size = 0
             try:
-                if os.path.isfile(resolved_path):
-                    game_size = os.path.getsize(resolved_path)
+                if game_dir and os.path.isdir(game_dir):
+                    game_size = self._calculate_folder_size(game_dir)
                 elif os.path.isdir(resolved_path):
-                    for dirpath, dirnames, filenames in os.walk(game_path):
-                        for fn in filenames:
-                            fp = os.path.join(dirpath, fn)
-                            game_size += os.path.getsize(fp)
+                    game_size = self._calculate_folder_size(resolved_path)
+                elif os.path.isfile(resolved_path):
+                    game_size = os.path.getsize(resolved_path)
             except Exception:
                 pass
             
@@ -2350,6 +2447,8 @@ class EmulatorHubWindow(QMainWindow):
                 "release_date": rel,
                 "summary": summary,
                 "cover_image_id": cover_id,
+                "igdb_score": score,
+                "igdb_rating_count": score_count,
                 "tracking_exe": combo_exe.currentData() if combo_exe.isEnabled() and combo_exe.currentData() else "",
                 "game_dir": game_dir,
                 "size": game_size
@@ -2824,23 +2923,21 @@ class EmulatorHubWindow(QMainWindow):
                     for f in files:
                         file_path = Path(root) / f
                         suffix = file_path.suffix.lower()
-                        if suffix not in PLATFORM_SUFFIXES:
-                            continue
-                        platform = PLATFORM_SUFFIXES[suffix]
-                        if platform == "PlayStation 3" and file_path.name.upper() == "PS3_DISC.SFB":
-                            continue
-                        target_path = str(file_path)
-                        g_hash = hashlib.md5(target_path.encode('utf-8')).hexdigest()
-                        if g_hash not in self.config_manager.config["game_metadata"]:
-                            self.config_manager.config["game_metadata"][g_hash] = {
-                                "title": file_path.stem, "path": target_path,
-                                "platform": platform, "playtime": 0, "sessions": [],
-                                "developer": "Unknown Developer", "release_date": "N/A",
-                                "summary": f"Local ROM for {platform}", "cover_image_id": "",
-                                "size": file_path.stat().st_size
-                            }
-                            new_count += 1
-
+                        if suffix in PLATFORM_SUFFIXES:
+                            platform = PLATFORM_SUFFIXES[suffix]
+                            if platform == "PlayStation 3" and file_path.name.upper() == "PS3_DISC.SFB":
+                                continue
+                            target_path = str(file_path)
+                            g_hash = hashlib.md5(target_path.encode('utf-8')).hexdigest()
+                            if g_hash not in self.config_manager.config["game_metadata"]:
+                                self.config_manager.config["game_metadata"][g_hash] = {
+                                    "title": file_path.stem, "path": target_path,
+                                    "platform": platform, "playtime": 0, "sessions": [],
+                                    "developer": "Unknown Developer", "release_date": "N/A",
+                                    "summary": f"Local ROM for {platform}", "cover_image_id": "",
+                                    "size": file_path.stat().st_size
+                                }
+                                new_count += 1
             
             if new_count > 0:
                 self.config_manager.save_config()

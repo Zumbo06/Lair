@@ -1,43 +1,157 @@
-# EmulatorHub v2.00 🎮
+# EmulatorHub v3.00 🎮
 
-A modern, feature-rich game library manager for emulators with enhanced UI/UX and powerful management tools.
+A premium, all-in-one game library manager for emulated and PC games — featuring IGDB metadata, automatic game scanning, playtime tracking, and a stunning modern UI.
 
-![Version](https://img.shields.io/badge/version-2.00-blue)
+![Version](https://img.shields.io/badge/version-3.00-blue)
 ![Python](https://img.shields.io/badge/python-3.8+-green)
 ![PyQt6](https://img.shields.io/badge/PyQt6-6.4+-orange)
 
-## 🌟 What's New in v2.00
+## ✨ Key Features
 
-### 🎨 Modern UI Enhancements
-- **Tokyo Night Color Scheme** - Beautiful dark theme with cyan/purple accents
-- **Enhanced Light Theme** - Professional, clean alternative theme
-- **Gradient Backgrounds** - Stunning visual effects on game cards
-- **Smooth Animations** - Polished hover effects and transitions
-- **Better Typography** - Modern Segoe UI fonts with improved readability
-- **Enhanced Borders & Shadows** - 3D depth with rounded corners
+### 🎮 Universal Game Library
+- **Auto-scan Steam, Epic Games & Xbox** libraries — games appear instantly
+- **ROM scanning** across configured library folders with automatic platform detection
+- **PS3 folder detection** — finds `PS3_GAME/USRDIR/EBOOT.BIN` structures, parses `PARAM.SFO` for real game titles
+- **PS4 folder detection** — detects `sce_sys/param.sfo` structures
+- **Manual game adding** — browse for files or folders, select executables, auto-detect platform from file extension
+- **Custom collections** — organize games into personal groups
 
-### 🔍 Advanced Search & Filtering
-- **Smart Search Bar** with clear button (✕)
-- **Platform Filter Dropdown** - Quick filter without changing selection
-- **Debounced Search** - Improved performance (300ms delay)
-- **Enhanced Sorting** - Name, Size (Asc/Desc), Time Played, Date Added
-- **Game Count Display** - See filtered results in status bar
+### 🌐 IGDB Metadata Integration
+- **Automatic metadata fetching** — developer, release date, summary, genres, cover art, and IGDB scores
+- **Smart title matching** — cleans serial codes, strips brackets/version numbers, handles trademark symbols
+- **Serial code resolution** — resolves PS1/PS2/PS3 serial codes to real game titles via SerialStation & RPCS3 compatibility DB
+- **Manual IGDB search** — right-click any game to search and pick the correct metadata match
+- **Cover art downloads** — high-quality 720p poster art from IGDB
+- **Persistent cache** — metadata is cached locally so repeat lookups are instant
 
-### 🎯 Game Card Enhancements
-- **Playtime Badges** - Visual indicators on game cards
-- **Hover Effects** - Smooth background highlighting
-- **Shadow Effects** - Icons pop with depth
-- **Custom Star Icons** - Beautiful favorite indicators
-- **Better Selection** - Thick cyan borders (3px)
+### ⏱ Playtime Tracking
+- **Automatic process tracking** via `psutil` — monitors game PIDs and child processes
+- **Smart process detection** — scans by folder path and executable name when launchers restart
+- **Grace period logic** — prevents false session ends during game/launcher restarts
+- **Session history** — every play session is recorded with timestamp and duration
+- **Last played date** — shows relative dates (Today, Yesterday, 3 days ago, 2 weeks ago, etc.) on the banner, info modal, and facts grid
+- **Total playtime** — accumulated across all sessions, displayed in hours
 
 ### 📊 Statistics Dashboard
-- **Total Games & Size** - Complete library overview
-- **Total Playtime** - Track your gaming hours
-- **Top 5 Most Played** - See your favorite games
-- **Platform Distribution** - Top platforms by game count
-- **Beautiful Formatting** - Styled HTML presentation
+- **Total games & library size** — full overview of your collection
+- **Total playtime** — track your gaming hours across all titles
+- **Top 5 most played** — see your favorite games at a glance
+- **Platform distribution** — top platforms by game count
 
-### ⌨️ Keyboard Shortcuts
+### 🎨 Premium UI/UX
+- **Obsidian & Velvet Violet theme** — deep dark backgrounds with neon cyan and violet accents
+- **Game card grid** — full-bleed cover art with cinematic zoom on hover, neon glow selection borders
+- **Glassmorphic badges** — playtime pills, platform tags, and favorite bookmarks overlaid on cards
+- **Steam-style banner** — large header showing selected game with cover, metadata, and play/stop button
+- **Info modal** — poster art with drop shadow, facts grid (developer, released, playtime, last played, file size, IGDB score), clickable file path, and full description
+- **Smooth animations** — hover effects, gradient overlays, and transitions throughout
+- **Grid & list views** — toggle with Ctrl+Tab
+
+### 🔍 Search & Filtering
+- **Smart search bar** with clear button and debounced input (300ms)
+- **Platform filter dropdown** — quick filter by console/platform
+- **Sorting options** — Name, Size (Asc/Desc), Time Played, Date Added
+- **Game count** — filtered results shown in status bar
+
+### 🚀 PC Game Support
+- **Steam** — reads `libraryfolders.vdf` and `appmanifest_*.acf` to discover all installed games across multiple Steam libraries; launches via `steam://rungameid/`
+- **Epic Games** — parses manifest files from `ProgramData\Epic\EpicGamesLauncher\Data\Manifests`
+- **Xbox / Game Pass** — scans `XboxGames` folders on all drives and custom library paths
+- **Common folders** — scans `C:\Games`, `D:\Games`, GOG Galaxy, and user-defined paths
+- **Executable selection** — when a folder has multiple `.exe` files, pick the right one to launch and remember the choice
+
+### 🕹 Emulator Management
+- **Auto-detection** of popular emulators (RPCS3, Dolphin, PCSX2, Citra, Yuzu, PPSSPP, etc.)
+- **Manual emulator configuration** — add custom emulators with launch arguments
+- **Platform defaults** — set a default emulator per platform
+- **`%ROM%` token** — custom argument placement for ROM path
+- **RPCS3 auto-discovery** — automatically finds RPCS3 when launching PS3 games
+- **shadPS4 support** — smart handling of launcher vs. core executable
+
+### 📁 File Size Calculation
+- **Installation folder sizing** — when a game has an installation directory (`game_dir`), the total folder size is calculated by walking the entire directory tree
+- **Background calculation** — sizes for games with `size=0` are computed lazily in a background thread and the UI updates automatically
+- **Works for all game types** — folder-based games (Steam, Epic, Xbox, PS3), single-file ROMs, and manually added games
+
+## 📋 Requirements
+
+```
+PyQt6>=6.4.0
+psutil>=5.9.0
+requests
+```
+
+Optional:
+```
+Pillow>=9.0.0    # Enhanced image processing
+```
+
+## 🚀 Installation
+
+### Quick Start (Recommended)
+1. **Clone or download** this repository
+2. **Run setup**:
+   ```bash
+   setup.bat
+   ```
+3. **Launch the app**:
+   ```bash
+   run.bat
+   ```
+
+### Manual Setup
+1. **Install dependencies**:
+   ```bash
+   pip install -r Requirements.txt
+   ```
+2. **Run the application**:
+   ```bash
+   python emulator_hub_app.py
+   ```
+
+## 🎮 Supported Platforms
+
+### Auto-Detected (ROM Scanning)
+| Platform | Extensions |
+|----------|-----------|
+| PlayStation 4 | `.pkg` |
+| PlayStation 3 | `.sfb` + folder detection |
+| PlayStation 2 | `.iso` |
+| PlayStation 1 | `.chd`, `.cue` |
+| PSP | `.cso` |
+| Nintendo Switch | `.nsp`, `.xci` |
+| Wii | `.wbfs` |
+| GameCube | `.gcz`, `.rvz` |
+| Nintendo 64 | `.z64` |
+| Super Nintendo | `.sfc` |
+| NES | `.nes` |
+| Nintendo DS | `.nds` |
+| Nintendo 3DS | `.3ds` |
+| Game Boy Advance | `.gba` |
+| Game Boy Color | `.gbc` |
+| Game Boy | `.gb` |
+| Sega Dreamcast | `.cdi`, `.gdi` |
+| Sega Saturn | `.sat` |
+| Sega 32X | `.32x` |
+| Sega Master System | `.sms` |
+| Game Gear | `.gg` |
+
+### Manually Addable
+| Platform | Notes |
+|----------|-------|
+| Sega Genesis / Mega Drive | `.md`, `.gen`, `.smd` — add via "Add Game" dialog |
+| PC | Auto-scanned from Steam/Epic/Xbox or added manually |
+| Xbox | Auto-scanned from XboxGames folders |
+
+### PC Game Sources (Auto-Scanned)
+- Steam (all library folders)
+- Epic Games Store
+- Xbox / Game Pass
+- GOG Galaxy
+- Custom game folders
+
+## ⌨️ Keyboard Shortcuts
+
 | Shortcut | Action |
 |----------|--------|
 | **F5** | Refresh Library |
@@ -49,203 +163,65 @@ A modern, feature-rich game library manager for emulators with enhanced UI/UX an
 | **Ctrl+I** | Show Detailed Info |
 | **Ctrl+B** | Toggle Batch Mode |
 
-### 📦 Game Collections
-- **Create Custom Collections** - Organize games your way
-- **Add to Collections** - Right-click context menu
-- **Collection Manager** - Create, rename, delete collections
-- **Multiple Collections** - Games can be in multiple collections
-
-### 🔧 Enhanced Game Management
-- **Detailed Info Dialog** - Edit metadata, add notes, manage tags
-- **Batch Operations** - Multi-select for mass actions
-- **Batch Delete** - Delete multiple games at once
-- **Custom Tags** - Comma-separated game tags
-- **Notes Field** - Add personal notes to games
-
-### ⚙️ Settings Panel
-- **General Settings** - Auto-backup, performance modes
-- **Appearance Settings** - Theme selection
-- **Hotkeys Reference** - View all keyboard shortcuts
-- **Performance Modes** - Low, Balanced, High
-
-### 🚀 Performance Improvements
-- **In-Memory Image Cache** - Faster icon loading
-- **Lazy Loading** - Efficient resource management
-- **Smart Caching** - Reduced disk I/O
-- **Optimized Rendering** - Smoother scrolling
-
-### 💫 Splash Screen
-- **Animated Loading** - Beautiful startup experience
-- **Progress Indicator** - See what's happening
-- **Status Messages** - Know what's loading
-
-## 📋 Requirements
-
-```
-PyQt6>=6.4.0
-psutil>=5.9.0
-Pillow>=9.0.0
-```
-
-## 🚀 Installation
-
-1. **Clone or download** this repository
-2. **Install dependencies**:
-   ```bash
-   pip install -r Requirements.txt
-   ```
-3. **Run the application**:
-   ```bash
-   python emulator_hub_app.py
-   ```
-
-## 🎮 Supported Platforms
-
-### Consoles
-- **PlayStation** (1, 2, 3)
-- **Xbox** (Original, 360)
-- **Nintendo** (Switch, Wii, GameCube, 64)
-- **Sega** (Dreamcast, Genesis, Game Gear, Saturn)
-- **TurboGrafx-16**
-
-### Handhelds
-- **Game Boy** (Original, Color, Advance)
-- **Nintendo DS** / **3DS**
-- **PlayStation Portable (PSP)**
-- **Atari Lynx**
-
-## 🔧 Features
-
-### Library Management
-- ✅ Automatic game scanning with progress tracking
-- ✅ Multiple library folder support
-- ✅ Smart file organization by platform
-- ✅ Caching system for fast loading
-- ✅ Drag & drop folder support
-
-### Game Organization
-- ✅ Platform-based categorization
-- ✅ Favorites system with visual indicators
-- ✅ Recently played tracking
-- ✅ Custom collections
-- ✅ Tag system
-- ✅ Advanced search and filtering
-
-### Visual Customization
-- ✅ Grid and List view modes
-- ✅ Adjustable icon sizes
-- ✅ Custom game covers (drag & drop images)
-- ✅ Automatic thumbnail generation
-- ✅ Beautiful placeholder icons with gradients
-
-### Emulator Integration
-- ✅ Auto-detection of popular emulators
-- ✅ Manual emulator configuration
-- ✅ Custom launch arguments
-- ✅ Platform-specific defaults
-- ✅ Per-game emulator override
-
-### Metadata & Tracking
-- ✅ Playtime tracking with psutil
-- ✅ File size information
-- ✅ Custom notes per game
-- ✅ Tagging system
-- ✅ Statistics dashboard
-
-### User Experience
-- ✅ Dark and Light themes
-- ✅ Keyboard shortcuts
-- ✅ Context menus
-- ✅ Details panel
-- ✅ Batch operations
-- ✅ Settings dialog
-
-## 🎨 Themes
-
-### Modern Dark (Default)
-- Deep blue-black backgrounds (#1A1B26)
-- Cyan highlights (#2AC3DE)
-- Purple accents (#BB9AF7)
-- Perfect for long sessions
-
-### Modern Light
-- Clean white backgrounds (#F5F5F5)
-- Professional blue highlights (#5E81AC)
-- High contrast for readability
-
 ## 📖 Usage Guide
 
 ### Adding Games
-1. Click **"Manage Game Folders"** in toolbar
-2. Add folders containing your game files
-3. Click **F5** or **"Refresh Library"** to scan
-4. Games are automatically categorized by platform
+1. **Automatic scanning** — Click the scan button or press F5 to discover games from configured folders, Steam, Epic, and Xbox
+2. **Manual add** — Use the "Add Game" dialog to browse for a file or folder; select platform, executable, and cover art
+3. **Library folders** — Configure folder paths in the settings; all supported ROM types are auto-detected
 
 ### Launching Games
-1. **Double-click** a game or press **Enter**
-2. Select emulator if multiple available
-3. Set as default for faster future launches
+1. **Select a game** and click ▶ PLAY or press Enter
+2. **PC games** — launched directly or via Steam URI
+3. **Console games** — launched through the configured emulator for that platform
+4. **Multiple emulators** — if several emulators support the same platform, you'll be prompted to choose (with option to set a default)
 
-### Creating Collections
-1. Click **"Manage Collections"** in toolbar
-2. Create new collection with custom name
-3. Right-click games → **"Add to Collection"**
+### IGDB Metadata
+1. **Configure API keys** — set your Twitch Client ID & Secret in the settings (required for IGDB)
+2. **Auto-fetch** — metadata is fetched automatically when games are scanned
+3. **Manual search** — right-click a game → "Search IGDB" to find and apply the correct metadata
+4. **Enrichment** — clicking a game with missing metadata triggers a background fetch
 
-### Batch Operations
-1. Press **Ctrl+B** or click **"Batch Operations"**
-2. Select multiple games (Ctrl+Click or Shift+Click)
-3. Press **Delete** to remove selected games
-4. Or use context menu for other actions
+### System Tray
+- **Minimize to tray** — optionally hide the app to system tray when launching a game
+- **Tray notifications** — get notified when the app is minimized
+- **Restore** — click the tray icon to bring the window back
 
-### Custom Covers
-- **Drag & drop** image onto game card
-- Or right-click → **"Set Custom Image"**
-- Supports PNG, JPG, JPEG, WEBP
+## 🔧 Architecture
 
-### Editing Game Info
-- Press **Ctrl+I** on selected game
-- Or right-click → **"Detailed Info"**
-- Edit title, add notes, manage tags
+```
+EmulatorHub/
+├── emulator_hub_app.py    # Main application window & logic
+├── ui_components.py       # UI delegates, banner, info modal, stats dashboard
+├── config.py              # Configuration management & persistence
+├── api.py                 # IGDB API client with caching
+├── scanner.py             # PC game scanner (Steam, Epic, Xbox, common folders)
+├── tracker.py             # Playtime tracking with psutil process monitoring
+├── constants.py           # App constants, colors, version
+├── setup.bat              # One-click environment setup
+├── run.bat                # Launch script
+├── Requirements.txt       # Python dependencies
+└── icons/                 # Platform & UI icons
+```
 
-## 🔥 Advanced Features
-
-### Performance Modes
-- **Low** - Minimal animations, faster on older hardware
-- **Balanced** - Good performance with visual effects (default)
-- **High** - Maximum visual quality
-
-### Auto-Backup
-- Automatic config backups before changes
-- Restore from backup if issues occur
-
-### Smart Caching
-- Game library cached for instant loading
-- Image cache for faster thumbnails
-- Clear cache to force rescan
-
-## 🐛 Known Issues & Solutions
+## 🐛 Troubleshooting
 
 ### Game not launching?
-- Check emulator path in "Emulators" tab
-- Verify emulator supports the game format
-- Set custom launch arguments if needed
+- Check emulator path in the **Emulators** tab
+- Verify the emulator supports the game file format
+- For PC games, right-click → Edit Details to set the correct executable
 
 ### Playtime not tracking?
 - Install psutil: `pip install psutil`
-- Restart application after installation
+- Restart the application after installing
 
-### Images not loading?
-- Install Pillow: `pip install Pillow`
-- Check image format (PNG, JPG, JPEG, WEBP)
+### No metadata / covers?
+- Configure your Twitch Client ID & Secret in settings for IGDB access
+- Right-click a game → "Search IGDB" to manually find metadata
 
-## 🤝 Contributing
-
-Contributions welcome! Areas for improvement:
-- Online metadata fetching (IGDB, TheGamesDB)
-- Cloud sync support
-- Controller support for navigation
-- Game state save management
-- Achievement tracking
+### File sizes showing 0?
+- Sizes are calculated in the background on startup — wait a moment for them to populate
+- Games need a valid `game_dir` or file path that exists on disk
 
 ## 📜 License
 
@@ -254,12 +230,14 @@ This project is open source and available for personal use.
 ## 🙏 Credits
 
 Built with:
-- **PyQt6** - Modern Qt bindings for Python
-- **Pillow** - Image processing
-- **psutil** - Process and system utilities
+- **PyQt6** — Modern Qt bindings for Python
+- **psutil** — Process monitoring and system utilities
+- **requests** — HTTP client for IGDB API
+- **IGDB** — Game metadata, covers, and ratings
+- **Pillow** — Image processing (optional)
 
 ---
 
-**Enjoy your enhanced gaming library! 🎮✨**
+**Enjoy your premium gaming library! 🎮✨**
 
 For issues or feature requests, please create an issue on the repository.

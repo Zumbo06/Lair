@@ -320,13 +320,59 @@ class SpacedListItemDelegate(QStyledItemDelegate):
 # --- BRIEF INFO MODAL ---
 # =============================================================================
 class GameBriefInfoModal(QDialog):
+    def _format_duration(self, seconds):
+        try:
+            seconds = float(seconds or 0)
+        except Exception:
+            seconds = 0
+        if seconds < 60:
+            return f"{int(seconds)}s"
+        if seconds < 3600:
+            return f"{int(seconds // 60)}m"
+        return f"{seconds / 3600.0:.1f}h"
+
+    def _format_file_size(self, size_bytes):
+        try:
+            size_bytes = float(size_bytes or 0)
+        except Exception:
+            size_bytes = 0
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if size_bytes < 1024.0 or unit == "TB":
+                return f"{size_bytes:.1f} {unit}" if unit != "B" else f"{size_bytes:.0f} B"
+            size_bytes /= 1024.0
+        return "N/A"
+
+    def _format_last_played(self, timestamp):
+        """Format a unix timestamp into a human-readable 'last played' string."""
+        try:
+            ts = float(timestamp or 0)
+        except Exception:
+            ts = 0
+        if ts <= 0:
+            return "Never"
+        from datetime import datetime, timezone
+        dt = datetime.fromtimestamp(ts)
+        now = datetime.now()
+        delta = now - dt
+        if delta.days == 0:
+            return "Today"
+        elif delta.days == 1:
+            return "Yesterday"
+        elif delta.days < 7:
+            return f"{delta.days} days ago"
+        elif delta.days < 30:
+            weeks = delta.days // 7
+            return f"{weeks} week{'s' if weeks > 1 else ''} ago"
+        else:
+            return dt.strftime("%b %d, %Y")
+
     def __init__(self, game_data, cover_pixmap, parent=None):
         super().__init__(parent)
         from PyQt6.QtWidgets import QGraphicsDropShadowEffect
-
+        
         self.game_data = game_data
-        self.setWindowTitle(f"Info — {game_data.get('title', 'Unknown')}")
-        self.setMinimumSize(720, 460)
+        self.setWindowTitle(f"Info - {game_data.get('title')}")
+        self.setMinimumSize(680, 420)
         self.setStyleSheet(f"""
             QDialog {{
                 background-color: {Constants.C_BG_DARK};
@@ -334,276 +380,288 @@ class GameBriefInfoModal(QDialog):
                 border: 1px solid {Constants.C_BORDER};
                 border-radius: 12px;
             }}
-            QLabel {{ color: {Constants.C_TEXT_PRIMARY}; background: transparent; }}
-            QTextEdit {{
-                background-color: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 8px;
-                color: {Constants.C_TEXT_SECONDARY};
-                padding: 12px;
-                font-family: "Segoe UI";
-                font-size: 12px;
-            }}
-            QScrollBar:vertical {{
-                border: none; background: transparent; width: 6px; margin: 2px;
-            }}
-            QScrollBar::handle:vertical {{
-                background: {Constants.C_BORDER}; border-radius: 3px; min-height: 20px;
-            }}
-            QScrollBar::handle:vertical:hover {{ background: {Constants.C_TEXT_MUTED}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-                border: none; background: none;
-            }}
+            QLabel {{ color: {Constants.C_TEXT_PRIMARY}; }}
         """)
-
+        
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(24, 24, 24, 24)
         main_layout.setSpacing(24)
-
-        # ─── Left Side: Poster ───────────────────────────────────────────────
+        
+        # Left side: Poster with Drop Shadow
         poster_container = QWidget()
-        poster_container.setFixedSize(200, 310)
+        poster_container.setFixedSize(220, 310)
         poster_layout = QVBoxLayout(poster_container)
         poster_layout.setContentsMargins(0, 0, 0, 0)
-        poster_layout.setSpacing(8)
-
+        
         poster_label = QLabel()
-        poster_label.setFixedSize(200, 280)
+        poster_label.setFixedSize(220, 310)
         poster_label.setScaledContents(True)
         if cover_pixmap and not cover_pixmap.isNull():
+            # Add rounded corners to the pixmap
             rounded = QPixmap(cover_pixmap.size())
             rounded.fill(Qt.GlobalColor.transparent)
-            p2 = QPainter(rounded)
-            p2.setRenderHint(QPainter.RenderHint.Antialiasing)
-            clip_path = QPainterPath()
-            clip_path.addRoundedRect(QRectF(rounded.rect()), 14, 14)
-            p2.setClipPath(clip_path)
-            p2.drawPixmap(0, 0, cover_pixmap)
-            p2.end()
-            poster_label.setPixmap(rounded.scaled(200, 280, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation))
+            painter = QPainter(rounded)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            path = QPainterPath()
+            path.addRoundedRect(QRectF(rounded.rect()), 12, 12)
+            painter.setClipPath(path)
+            painter.drawPixmap(0, 0, cover_pixmap)
+            painter.end()
+            poster_label.setPixmap(rounded.scaled(220, 310, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation))
         else:
-            title_text = game_data.get("title", "?")
-            initials = "".join([w[0].upper() for w in title_text.split() if w])[:2]
-            poster_label.setText(initials)
-            poster_label.setFont(QFont("Segoe UI", 32, QFont.Weight.Bold))
+            poster_label.setStyleSheet(f"background-color: {Constants.C_BG_PANEL}; border: 1px solid {Constants.C_BORDER}; border-radius: 12px;")
+            poster_label.setText("No Cover")
             poster_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            poster_label.setStyleSheet(f"""
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #2b1b54, stop:1 #17112c);
-                border: 1px solid {Constants.C_BORDER};
-                border-radius: 14px;
-                color: {Constants.C_ACCENT_CYAN};
-            """)
-
-        shadow_fx = QGraphicsDropShadowEffect()
-        shadow_fx.setBlurRadius(28)
-        shadow_fx.setColor(QColor(0, 0, 0, 200))
-        shadow_fx.setOffset(0, 10)
-        poster_label.setGraphicsEffect(shadow_fx)
+        
+        # Add shadow effect
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 180))
+        shadow.setOffset(0, 8)
+        poster_label.setGraphicsEffect(shadow)
+        
         poster_layout.addWidget(poster_label)
-
-        # IGDB score badge below poster
-        igdb_score = game_data.get("igdb_score")
-        if igdb_score is not None:
-            score_pct = float(igdb_score)
-            score_frame = QFrame()
-            score_frame.setStyleSheet(f"""
-                background-color: {Constants.C_BG_PANEL};
-                border: 1px solid {Constants.C_BORDER};
-                border-radius: 8px;
-            """)
-            score_lay = QHBoxLayout(score_frame)
-            score_lay.setContentsMargins(10, 5, 10, 5)
-            score_lay.setSpacing(6)
-            star_count = round(score_pct / 20)
-            stars_str = "★" * star_count + "☆" * (5 - star_count)
-            stars_lbl = QLabel(stars_str)
-            stars_lbl.setFont(QFont("Segoe UI", 11))
-            stars_color = Constants.C_SUCCESS if score_pct >= 70 else (Constants.C_WARNING if score_pct >= 50 else Constants.C_ERROR)
-            stars_lbl.setStyleSheet(f"color: {stars_color}; background: transparent;")
-            score_num = QLabel(f"{score_pct:.0f}/100")
-            score_num.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-            score_num.setStyleSheet("color: #ffffff; background: transparent;")
-            score_lay.addWidget(stars_lbl)
-            score_lay.addStretch()
-            score_lay.addWidget(score_num)
-            poster_layout.addWidget(score_frame)
-
         main_layout.addWidget(poster_container)
-
-        # ─── Right Side: Details ─────────────────────────────────────────────
+        
+        # Right side: Details
         details_widget = QWidget()
         details_layout = QVBoxLayout(details_widget)
         details_layout.setContentsMargins(0, 0, 0, 0)
-        details_layout.setSpacing(10)
-
+        details_layout.setSpacing(12)
+        
         # Title
-        title_label = QLabel(game_data.get("title", "Unknown"))
-        title_label.setFont(QFont("Segoe UI", 20, QFont.Weight.ExtraBold))
+        title_label = QLabel(game_data.get("title"))
+        title_label.setFont(QFont("Segoe UI", 22, QFont.Weight.ExtraBold))
         title_label.setWordWrap(True)
-        title_label.setStyleSheet("color: #ffffff;")
         details_layout.addWidget(title_label)
-
-        # ── Metadata chips ─────────────────────────────────────────────────
+        
+        # Badges Layout (Platform, Dev, Year)
+        badges_layout = QHBoxLayout()
+        badges_layout.setSpacing(8)
+        
         plat = game_data.get("platform", "N/A")
         rel = game_data.get("release_date", "N/A")
         dev = game_data.get("developer", "Unknown Developer")
-        size_bytes = game_data.get("size", 0)
-
-        def create_chip(ico, txt, bg="#1a1d28", bdr=None, clr=None):
-            chip = QFrame()
-            chip.setStyleSheet(f"""
-                QFrame {{
-                    background-color: {bg};
-                    border: 1px solid {bdr or Constants.C_BORDER};
-                    border-radius: 6px;
-                }}
-            """)
-            lay = QHBoxLayout(chip)
-            lay.setContentsMargins(8, 4, 10, 4)
-            lay.setSpacing(5)
-            i_lbl = QLabel(ico)
-            i_lbl.setFont(QFont("Segoe UI Emoji", 10))
-            i_lbl.setStyleSheet("background: transparent; border: none;")
-            v_lbl = QLabel(txt)
-            v_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-            v_lbl.setStyleSheet(f"color: {clr or Constants.C_TEXT_PRIMARY}; background: transparent; border: none;")
-            lay.addWidget(i_lbl)
-            lay.addWidget(v_lbl)
-            return chip
-
-        chips_row = QHBoxLayout()
-        chips_row.setSpacing(8)
-        chips_row.setContentsMargins(0, 0, 0, 0)
-        chips_row.addWidget(create_chip("🖥", plat, bg="rgba(0,229,255,0.08)", bdr=Constants.C_ACCENT_CYAN, clr=Constants.C_ACCENT_CYAN))
-        if rel and rel != "N/A":
+        score = game_data.get("igdb_score")
+        genres = game_data.get("genres") or []
+        
+        def create_badge(text, color):
+            lbl = QLabel(text)
+            lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            lbl.setStyleSheet(f"background-color: {color}; color: #ffffff; padding: 4px 10px; border-radius: 10px;")
+            return lbl
+            
+        badges_layout.addWidget(create_badge(plat, Constants.C_ACCENT_CYAN))
+        if rel != "N/A":
             year = rel.split("-")[0] if "-" in rel else rel
-            chips_row.addWidget(create_chip("📅", year))
-        if dev and dev not in ("Unknown Developer", ""):
-            dev_short = dev if len(dev) <= 22 else dev[:20] + "…"
-            chips_row.addWidget(create_chip("🏢", dev_short))
-        if size_bytes and size_bytes > 0:
-            if size_bytes >= 1_073_741_824:
-                sz = f"{size_bytes/1_073_741_824:.1f} GB"
-            elif size_bytes >= 1_048_576:
-                sz = f"{size_bytes/1_048_576:.0f} MB"
-            else:
-                sz = f"{size_bytes/1024:.0f} KB"
-            chips_row.addWidget(create_chip("💾", sz))
-        chips_row.addStretch()
-        details_layout.addLayout(chips_row)
-
-        # ── Playtime panel ────────────────────────────────────────────────
+            badges_layout.addWidget(create_badge(year, "#34495e"))
+        if score is not None:
+            score_text = f"IGDB {score:.1f}"
+            badges_layout.addWidget(create_badge(score_text, Constants.C_ACCENT_VIOLET))
+        if genres:
+            genre_text = ", ".join(genres[:3])
+            if len(genres) > 3:
+                genre_text += " +"
+            badges_layout.addWidget(create_badge(genre_text, "#44546a"))
+        
+        badges_layout.addStretch()
+        details_layout.addLayout(badges_layout)
+        
+        # Quick Facts Grid
+        facts_widget = QWidget()
+        facts_layout = QGridLayout(facts_widget)
+        facts_layout.setContentsMargins(0, 0, 0, 0)
+        facts_layout.setSpacing(8)
+        
         hours = game_data.get("playtime", 0) / 3600.0
-        pt_frame = QFrame()
-        pt_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {"rgba(0,200,83,0.07)" if hours > 0 else "rgba(255,255,255,0.03)"};
-                border: 1px solid {"rgba(0,200,83,0.25)" if hours > 0 else Constants.C_BORDER};
+        
+        last_played = game_data.get("last_played", 0)
+        
+        facts = [
+            ("DEVELOPER", dev, Constants.C_ACCENT_CYAN),
+            ("RELEASED", rel, Constants.C_ACCENT_VIOLET),
+            ("PLAYTIME", self._format_duration(game_data.get("playtime", 0)), Constants.C_SUCCESS if hours > 0 else Constants.C_TEXT_MUTED),
+            ("LAST PLAYED", self._format_last_played(last_played), Constants.C_SUCCESS if last_played > 0 else Constants.C_TEXT_MUTED),
+            ("FILE SIZE", self._format_file_size(game_data.get("size", 0)), Constants.C_WARNING),
+        ]
+        if score is not None:
+            facts.append(("IGDB SCORE", f"{float(score):.1f}/100", Constants.C_ACCENT_VIOLET))
+        
+        for idx, (label, value, color) in enumerate(facts):
+            fact_box = QFrame()
+            fact_box.setStyleSheet(f"""
+                background-color: rgba(255, 255, 255, 0.025);
+                border: 1px solid {Constants.C_BORDER};
                 border-radius: 8px;
-            }}
-        """)
-        pt_lay = QHBoxLayout(pt_frame)
-        pt_lay.setContentsMargins(12, 8, 12, 8)
-        pt_ico = QLabel("⏱")
-        pt_ico.setFont(QFont("Segoe UI Emoji", 14))
-        pt_ico.setStyleSheet("background: transparent; border: none;")
-        if hours > 0:
-            pt_txt = QLabel(f"{hours:.1f} hours on record")
-            pt_txt.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-            pt_txt.setStyleSheet(f"color: {Constants.C_SUCCESS}; background: transparent; border: none;")
-        else:
-            pt_txt = QLabel("Never played yet")
-            pt_txt.setFont(QFont("Segoe UI", 10))
-            pt_txt.setStyleSheet(f"color: {Constants.C_TEXT_MUTED}; background: transparent; border: none;")
-        pt_lay.addWidget(pt_ico)
-        pt_lay.addWidget(pt_txt)
-        pt_lay.addStretch()
-        details_layout.addWidget(pt_frame)
-
-        # ── File path ────────────────────────────────────────────────────
+                padding: 8px;
+            """)
+            fact_layout = QVBoxLayout(fact_box)
+            fact_layout.setContentsMargins(8, 6, 8, 6)
+            fact_layout.setSpacing(2)
+            
+            fact_label = QLabel(label)
+            fact_label.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
+            fact_label.setStyleSheet(f"color: {Constants.C_TEXT_MUTED}; letter-spacing: 0.6px;")
+            
+            fact_value = QLabel(str(value if value else "N/A"))
+            fact_value.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+            fact_value.setStyleSheet(f"color: {color};")
+            fact_value.setWordWrap(True)
+            
+            fact_layout.addWidget(fact_label)
+            fact_layout.addWidget(fact_value)
+            facts_layout.addWidget(fact_box, idx // 2, idx % 2)
+        
+        details_layout.addWidget(facts_widget)
+        
+        # Clickable File / Installation path location
         raw_path = game_data.get("path", "")
         if raw_path:
-            path_row = QHBoxLayout()
-            path_row.setContentsMargins(0, 0, 0, 0)
-            path_row.setSpacing(6)
-            display_path = raw_path if len(raw_path) <= 52 else "…" + raw_path[-49:]
-            path_icon_lbl = QLabel("📁")
-            path_icon_lbl.setFont(QFont("Segoe UI Emoji", 10))
-            path_icon_lbl.setStyleSheet("background: transparent;")
-            path_row.addWidget(path_icon_lbl)
+            path_layout = QHBoxLayout()
+            path_layout.setContentsMargins(0, 0, 0, 0)
+            path_layout.setSpacing(6)
+            
+            # Shorten the path for clean look
+            display_path = raw_path
+            if len(raw_path) > 45:
+                display_path = "..." + raw_path[-42:]
+                
+            path_icon = QLabel("📁")
+            path_icon.setFont(QFont("Segoe UI", 10))
+            path_layout.addWidget(path_icon)
+            
             path_btn = QPushButton(display_path)
             path_btn.setFlat(True)
             path_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             path_btn.setToolTip(raw_path)
             path_btn.setStyleSheet(f"""
                 QPushButton {{
-                    color: {Constants.C_TEXT_MUTED}; text-align: left;
-                    padding: 0px; border: none; background-color: transparent;
-                    text-decoration: underline; font-size: 11px;
+                    color: {Constants.C_TEXT_MUTED};
+                    text-align: left;
+                    padding: 0px;
+                    border: none;
+                    background-color: transparent;
+                    text-decoration: underline;
+                    font-size: 11px;
                 }}
-                QPushButton:hover {{ color: {Constants.C_ACCENT_CYAN}; }}
+                QPushButton:hover {{
+                    color: {Constants.C_ACCENT_CYAN};
+                }}
             """)
+            
             def open_and_select_file():
-                import subprocess, os as _os
-                if _os.path.exists(raw_path):
-                    subprocess.Popen(f'explorer /select,"{_os.path.normpath(raw_path)}"')
+                import subprocess
+                import os
+                if os.path.exists(raw_path):
+                    subprocess.Popen(f'explorer /select,"{os.path.normpath(raw_path)}"')
                 else:
                     game_dir = game_data.get("game_dir", "")
-                    if game_dir and _os.path.exists(game_dir):
-                        _os.startfile(game_dir)
+                    if game_dir and os.path.exists(game_dir):
+                        os.startfile(game_dir)
                     else:
                         from PyQt6.QtWidgets import QMessageBox
                         QMessageBox.warning(self, "Unavailable", f"File path does not exist:\n{raw_path}")
+                        
             path_btn.clicked.connect(open_and_select_file)
-            path_row.addWidget(path_btn)
-            path_row.addStretch()
-            details_layout.addLayout(path_row)
-
-        # ── Summary/Description ──────────────────────────────────────────
+            path_layout.addWidget(path_btn)
+            path_layout.addStretch()
+            details_layout.addLayout(path_layout)
+        
+        # Playtime hours + last played
+        hours = game_data.get("playtime", 0) / 3600.0
+        last_played = game_data.get("last_played", 0)
+        last_played_str = self._format_last_played(last_played)
+        if hours == 0:
+            time_text = "⏱ Never Played"
+        elif last_played > 0:
+            time_text = f"⏱ {hours:.1f} hours on record  •  Last played: {last_played_str}"
+        else:
+            time_text = f"⏱ {hours:.1f} hours on record"
+        playtime_label = QLabel(time_text)
+        playtime_label.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+        playtime_label.setStyleSheet(f"color: {Constants.C_SUCCESS if hours > 0 else Constants.C_TEXT_MUTED};")
+        details_layout.addWidget(playtime_label)
+        
+        # Summary/Description
         summary_box = QTextEdit()
         summary_box.setReadOnly(True)
         summary_box.setPlainText(game_data.get("summary", "No description available."))
+        summary_box.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                color: {Constants.C_TEXT_SECONDARY};
+                padding: 12px;
+                font-family: "Segoe UI";
+                font-size: 13px;
+                line-height: 1.5;
+            }}
+            QScrollBar:vertical {{
+                border: none;
+                background: transparent;
+                width: 8px;
+                margin: 4px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {Constants.C_BORDER};
+                border-radius: 4px;
+                min-height: 20px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {Constants.C_TEXT_MUTED};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                border: none;
+                background: none;
+            }}
+        """)
         details_layout.addWidget(summary_box, 1)
-
-        # ── Dialog Buttons ───────────────────────────────────────────────
-        btn_row = QHBoxLayout()
-        btn_row.setContentsMargins(0, 8, 0, 0)
-        btn_row.addStretch()
+        
+        # Dialog Buttons
+        button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 8, 0, 0)
+        button_layout.addStretch()
+        
         close_btn = QPushButton("Close")
         close_btn.setFixedSize(100, 36)
         close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: transparent; border: 1px solid {Constants.C_BORDER};
-                color: {Constants.C_TEXT_PRIMARY}; border-radius: 6px; font-weight: bold;
+                background-color: transparent;
+                border: 1px solid {Constants.C_BORDER};
+                color: {Constants.C_TEXT_PRIMARY};
+                border-radius: 6px;
+                font-weight: bold;
             }}
             QPushButton:hover {{
-                background-color: rgba(255,255,255,0.05); border-color: {Constants.C_TEXT_MUTED};
+                background-color: rgba(255,255,255,0.05);
+                border-color: {Constants.C_TEXT_MUTED};
             }}
         """)
         close_btn.clicked.connect(self.reject)
-        btn_row.addWidget(close_btn)
-        play_btn = QPushButton("▶  PLAY NOW")
-        play_btn.setFixedSize(130, 36)
+        button_layout.addWidget(close_btn)
+        
+        play_btn = QPushButton("▶ PLAY")
+        play_btn.setFixedSize(120, 36)
         play_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         play_btn.setStyleSheet(f"""
             QPushButton {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {Constants.C_ACCENT_VIOLET}, stop:1 #6a3de8);
-                color: #ffffff; font-weight: bold; border-radius: 6px;
-                border: none; letter-spacing: 0.5px;
+                background-color: {Constants.C_ACCENT_VIOLET};
+                color: #ffffff;
+                font-weight: bold;
+                border-radius: 6px;
+                border: none;
             }}
             QPushButton:hover {{
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 {Constants.C_VIOLET_HOVER}, stop:1 #7b5af0);
+                background-color: {Constants.C_VIOLET_HOVER};
             }}
         """)
         play_btn.clicked.connect(self.accept)
-        btn_row.addWidget(play_btn)
-        details_layout.addLayout(btn_row)
+        button_layout.addWidget(play_btn)
+        
+        details_layout.addLayout(button_layout)
         main_layout.addWidget(details_widget, 1)
-
 
 # =============================================================================
 # --- PREMIUM GAME HEADER BANNER ---
@@ -796,7 +854,26 @@ class SteamGameBanner(QWidget):
         self.meta_label.setText(f"{game_data.get('platform')}  |  Developer: {dev}  |  Released: {rel}")
         
         hours = game_data.get("playtime", 0) / 3600.0
-        self.playtime_label.setText("Never Played" if hours == 0 else f"{hours:.1f} hours played")
+        last_played = game_data.get("last_played", 0)
+        if hours == 0:
+            playtime_text = "Never Played"
+        elif last_played > 0:
+            from datetime import datetime
+            dt = datetime.fromtimestamp(last_played)
+            now = datetime.now()
+            delta = now - dt
+            if delta.days == 0:
+                lp_str = "Today"
+            elif delta.days == 1:
+                lp_str = "Yesterday"
+            elif delta.days < 7:
+                lp_str = f"{delta.days}d ago"
+            else:
+                lp_str = dt.strftime("%b %d")
+            playtime_text = f"{hours:.1f} hours played  •  Last: {lp_str}"
+        else:
+            playtime_text = f"{hours:.1f} hours played"
+        self.playtime_label.setText(playtime_text)
         
         if cover_pixmap and not cover_pixmap.isNull():
             self.cover_label.setPixmap(cover_pixmap.scaled(self.cover_label.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation))
@@ -853,81 +930,41 @@ class StatsDashboard(QWidget):
         
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("""
-            QScrollArea { border: none; background-color: transparent; }
-            QScrollBar:vertical { border: none; background: transparent; width: 6px; margin: 2px; }
-            QScrollBar::handle:vertical { background: #2a2c38; border-radius: 3px; min-height: 20px; }
-            QScrollBar::handle:vertical:hover { background: #444660; }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { border: none; background: none; }
-        """)
+        scroll.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
         scroll.verticalScrollBar().setSingleStep(100)
         
         content = QWidget()
         self.content_layout = QVBoxLayout(content)
-        self.content_layout.setContentsMargins(28, 28, 28, 28)
-        self.content_layout.setSpacing(20)
+        self.content_layout.setContentsMargins(24, 24, 24, 24)
+        self.content_layout.setSpacing(24)
         
-        # ── Header ─────────────────────────────────────────────────────────
+        # Header block
         header_widget = QWidget()
-        header_layout = QHBoxLayout(header_widget)
+        header_layout = QVBoxLayout(header_widget)
         header_layout.setContentsMargins(0, 0, 0, 0)
-        
-        title_block = QWidget()
-        title_v = QVBoxLayout(title_block)
-        title_v.setContentsMargins(0, 0, 0, 0)
-        title_v.setSpacing(3)
+        header_layout.setSpacing(4)
         
         title_lbl = QLabel("STATS & ANALYTICS")
-        title_lbl.setFont(QFont("Segoe UI", 17, QFont.Weight.Bold))
+        title_lbl.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         title_lbl.setStyleSheet(f"color: {Constants.C_ACCENT_CYAN}; letter-spacing: 1.5px;")
         
-        subtitle_lbl = QLabel("Your playtime, platform distribution, and session history at a glance.")
+        subtitle_lbl = QLabel("Track your playtime, platform distribution, and game sessions history.")
         subtitle_lbl.setFont(QFont("Segoe UI", 10))
         subtitle_lbl.setStyleSheet(f"color: {Constants.C_TEXT_MUTED};")
         
-        title_v.addWidget(title_lbl)
-        title_v.addWidget(subtitle_lbl)
-        header_layout.addWidget(title_block, 1)
+        header_layout.addWidget(title_lbl)
+        header_layout.addWidget(subtitle_lbl)
         self.content_layout.addWidget(header_widget)
         
-        # ── Section divider helper ─────────────────────────────────────────
-        def make_section_divider():
-            div = QFrame()
-            div.setFrameShape(QFrame.Shape.HLine)
-            div.setStyleSheet(f"background-color: {Constants.C_BORDER}; border: none; max-height: 1px;")
-            div.setFixedHeight(1)
-            return div
-        
-        def make_section_label(text):
-            lbl = QLabel(text)
-            lbl.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
-            lbl.setStyleSheet(f"color: {Constants.C_TEXT_MUTED}; letter-spacing: 1.5px; background: transparent;")
-            return lbl
-        
-        # ── 1. Summary Cards ───────────────────────────────────────────────
-        self.content_layout.addWidget(make_section_divider())
-        self.content_layout.addWidget(make_section_label("OVERVIEW"))
+        # 1. Summary Cards Header
         self.cards_grid = QGridLayout()
-        self.cards_grid.setHorizontalSpacing(14)
-        self.cards_grid.setVerticalSpacing(14)
+        self.cards_grid.setHorizontalSpacing(16)
+        self.cards_grid.setVerticalSpacing(16)
         self.content_layout.addLayout(self.cards_grid)
         
-        # ── 1b. Period Badges Section ───────────────────────────────────────
-        self.content_layout.addWidget(make_section_divider())
-        self.content_layout.addWidget(make_section_label("PERIOD TOTALS"))
-        
-        self.period_badges_widget = QWidget()
-        self.period_badges_layout = QHBoxLayout(self.period_badges_widget)
-        self.period_badges_layout.setContentsMargins(0, 0, 0, 0)
-        self.period_badges_layout.setSpacing(14)
-        self.period_badges_layout.addStretch()
-        self.content_layout.addWidget(self.period_badges_widget)
-        
-        # ── 2. Main dashboard body ─────────────────────────────────────────
-        self.content_layout.addWidget(make_section_divider())
-        self.content_layout.addWidget(make_section_label("LEADERBOARDS & BREAKDOWN"))
+        # 2. Horizontal layout for the main dashboard body
         self.dashboard_layout = QHBoxLayout()
-        self.dashboard_layout.setSpacing(20)
+        self.dashboard_layout.setSpacing(24)
         self.content_layout.addLayout(self.dashboard_layout)
         
         # 2a. Left Column (Leaderboards)
@@ -936,17 +973,22 @@ class StatsDashboard(QWidget):
         self.left_layout.setContentsMargins(0, 0, 0, 0)
         self.left_layout.setSpacing(12)
         
+        left_title = QLabel("🏆 PLAYTIME LEADERBOARDS")
+        left_title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        left_title.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY}; letter-spacing: 0.5px;")
+        self.left_layout.addWidget(left_title)
+        
         self.columns_layout = QHBoxLayout()
-        self.columns_layout.setSpacing(14)
+        self.columns_layout.setSpacing(16)
         self.left_layout.addLayout(self.columns_layout)
         
-        self.dashboard_layout.addWidget(self.left_column, 2)
+        self.dashboard_layout.addWidget(self.left_column, 2) # Stretch factor 2
         
         # 2b. Right Column (Platform + Recent Activity)
         self.right_column = QWidget()
         self.right_layout = QVBoxLayout(self.right_column)
         self.right_layout.setContentsMargins(0, 0, 0, 0)
-        self.right_layout.setSpacing(20)
+        self.right_layout.setSpacing(24)
         
         self.platform_container = QWidget()
         self.platform_layout = QVBoxLayout(self.platform_container)
@@ -958,12 +1000,10 @@ class StatsDashboard(QWidget):
         self.recent_layout.setContentsMargins(0, 0, 0, 0)
         self.right_layout.addWidget(self.recent_container)
         
-        self.dashboard_layout.addWidget(self.right_column, 1)
+        self.dashboard_layout.addWidget(self.right_column, 1) # Stretch factor 1
         
         scroll.setWidget(content)
         main_layout.addWidget(scroll)
-
-
 
     def clear_layout(self, layout):
         if layout is None:
@@ -1004,6 +1044,17 @@ class StatsDashboard(QWidget):
             hours = seconds / 3600.0
             return f"{hours:.1f}h"
 
+    def format_file_size(self, size_bytes):
+        try:
+            size_bytes = int(size_bytes or 0)
+        except Exception:
+            size_bytes = 0
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if size_bytes < 1024.0 or unit == "TB":
+                return f"{size_bytes:.1f} {unit}" if unit != "B" else f"{size_bytes:.0f} B"
+            size_bytes /= 1024.0
+        return "N/A"
+
     def get_period_bounds(self, period):
         now = datetime.now()
         if period == "week":
@@ -1013,60 +1064,45 @@ class StatsDashboard(QWidget):
         elif period == "month":
             start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             if now.month == 12:
-                end = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+                end = now.replace(year=now.year + 1, month=1, day=1)
             else:
-                end = now.replace(month=now.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        else:  # year
+                end = now.replace(month=now.month + 1, day=1)
+        else:
             start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-            end = now.replace(year=now.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            end = now.replace(year=now.year + 1, month=1, day=1)
         return start.timestamp(), end.timestamp(), start, end
 
     def create_period_badge(self, label, start_dt, end_dt, value=None):
-        badge = QFrame()
-        badge.setObjectName("periodBadge")
+        badge = QWidget()
         badge.setStyleSheet(f"""
-            QFrame#periodBadge {{
-                background-color: {Constants.C_BG_PANEL};
-                border: 1px solid {Constants.C_BORDER};
-                border-radius: 12px;
-            }}
-            QFrame#periodBadge:hover {{
-                border: 1.5px solid {Constants.C_ACCENT_CYAN};
-                background-color: #1a1c25;
-            }}
+            background-color: rgba(255, 255, 255, 0.025);
+            border: 1px solid {Constants.C_BORDER};
+            border-radius: 10px;
+            padding: 8px 12px;
         """)
         layout = QVBoxLayout(badge)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(3)
+        layout.setContentsMargins(10, 6, 10, 6)
+        layout.setSpacing(2)
         
-        # Label at top (correct order: title first)
         title = QLabel(label.upper())
         title.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {Constants.C_ACCENT_CYAN}; letter-spacing: 0.8px; background: transparent;")
+        title.setStyleSheet(f"color: {Constants.C_ACCENT_CYAN}; letter-spacing: 0.8px;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
         
-        # Value in center
         if value is not None:
             value_lbl = QLabel(self.format_duration(value))
-            value_lbl.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-            value_lbl.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY}; background: transparent;")
-            value_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            layout.addWidget(value_lbl)
-        else:
-            value_lbl = QLabel("—")
-            value_lbl.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-            value_lbl.setStyleSheet(f"color: {Constants.C_TEXT_MUTED}; background: transparent;")
+            value_lbl.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+            value_lbl.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY};")
             value_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(value_lbl)
         
-        # Reset date at bottom
-        reset = QLabel(f"Resets {end_dt.strftime('%b %d')}")
+        reset = QLabel(f"Resets {end_dt.strftime('%b %d, %H:%M')}")
         reset.setFont(QFont("Segoe UI", 7, QFont.Weight.Normal))
-        reset.setStyleSheet(f"color: {Constants.C_TEXT_MUTED}; background: transparent;")
+        reset.setStyleSheet(f"color: {Constants.C_TEXT_MUTED};")
         reset.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(reset)
         
+        layout.addWidget(title)
+        layout.addWidget(reset)
         return badge
 
     def create_summary_card(self, title, value, icon, accent_color):
@@ -1607,21 +1643,13 @@ class StatsDashboard(QWidget):
         self.cards_grid.addWidget(self.create_summary_card("FAVORITE PLATFORM", favorite_system, gamepad_icon, Constants.C_SUCCESS), 0, 2)
         self.cards_grid.addWidget(self.create_summary_card("ACTIVE SESSIONS", f"{total_sessions} sessions", "📈", Constants.C_WARNING), 0, 3)
         
-        # Populate period badges into dedicated widget (avoids accumulation on multiple refreshes)
-        self.clear_layout(self.period_badges_layout)
-        
-        for label, start_dt, end_dt, val in [
-            ("This Week",  week_start_dt,  week_end_dt,  sum(week_stats.values())),
-            ("This Month", month_start_dt, month_end_dt, sum(month_stats.values())),
-            ("This Year",  year_start_dt,  year_end_dt,  sum(year_stats.values())),
-        ]:
-            badge = self.create_period_badge(label, start_dt, end_dt, val)
-            badge.setMinimumWidth(195)
-            badge.setMaximumWidth(240)
-            self.period_badges_layout.addWidget(badge)
-        
-        self.period_badges_layout.addStretch()
-
+        period_layout = QHBoxLayout()
+        period_layout.setSpacing(12)
+        period_layout.addWidget(self.create_period_badge("Current Week", week_start_dt, week_end_dt, sum(week_stats.values())))
+        period_layout.addWidget(self.create_period_badge("Current Month", month_start_dt, month_end_dt, sum(month_stats.values())))
+        period_layout.addWidget(self.create_period_badge("Current Year", year_start_dt, year_end_dt, sum(year_stats.values())))
+        period_layout.addStretch()
+        self.content_layout.addLayout(period_layout)
         
         self.columns_layout.addWidget(self.create_ranking_column("THIS WEEK", week_stats, game_lookup))
         self.columns_layout.addWidget(self.create_ranking_column("THIS MONTH", month_stats, game_lookup))
