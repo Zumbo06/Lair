@@ -855,12 +855,19 @@ class EmulatorHubWindow(QMainWindow):
         self.chk_tray.setChecked(self.config_manager.config.get("minimize_to_tray_on_launch", False))
         self.chk_tray.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY}; font-weight: normal;")
         
+        self.chk_no_autoscan = QCheckBox("Don't Auto scan at start")
+        self.chk_no_autoscan.setChecked(not self.config_manager.config.get("auto_scan_on_startup", True))
+        self.chk_no_autoscan.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY}; font-weight: normal;")
+        
         def save_behavior():
             self.config_manager.config["minimize_to_tray_on_launch"] = self.chk_tray.isChecked()
+            self.config_manager.config["auto_scan_on_startup"] = not self.chk_no_autoscan.isChecked()
             self.config_manager.save_config()
             
         self.chk_tray.stateChanged.connect(save_behavior)
+        self.chk_no_autoscan.stateChanged.connect(save_behavior)
         behavior_layout.addWidget(self.chk_tray)
+        behavior_layout.addWidget(self.chk_no_autoscan)
         content_layout.addWidget(box_behavior)
         
         scroll.setWidget(content)
