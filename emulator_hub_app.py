@@ -38,11 +38,14 @@ from ui_components import (
 class EmulatorHubWindow(QMainWindow):
     # Emitted from background thread when a single game's metadata has been enriched
     metadata_enriched = pyqtSignal(str)  # game_hash
+    # Emitted from background thread when a single game's metadata enrichment fails/not found
+    metadata_fetch_failed = pyqtSignal(str, str)  # game_hash, title
 
     def __init__(self, config_manager: ConfigManager):
         super().__init__()
         self.config_manager = config_manager
         self.image_cache = {} # Local in-memory QPixmap cache
+        self._cover_cache = {}  # Hash -> QIcon cache for covers (avoids disk reads on every refresh)
         self.enriching_hashes = set() # Track games currently fetching metadata to prevent duplicate threads
         self._pending_enrichments = 0  # Count of in-flight background enrichments
 
@@ -54,6 +57,7 @@ class EmulatorHubWindow(QMainWindow):
 
         # Connect metadata_enriched signal to in-place hot-refresh slot
         self.metadata_enriched.connect(self._on_single_enrichment_done)
+        self.metadata_fetch_failed.connect(self._on_metadata_fetch_failed)
 
         # Instantiate logical managers
         self.igdb_client = IGDBClient(
@@ -1294,7 +1298,7 @@ class EmulatorHubWindow(QMainWindow):
                             "size": file_path.stat().st_size
                         })
                         
-        # 3. Automatically locate and scan RPCS3 dev_hdd0/game folder if RPCS3 is configured!
+        # 3. Automatically locate and scan RPCS3 dev_hdd0/game and games folders if RPCS3 is configured!
         rpcs3_game_dirs = []
         shadps4_game_dirs = []
         for name, emu in self.config_manager.config.get("emulators", {}).items():
@@ -1306,6 +1310,9 @@ class EmulatorHubWindow(QMainWindow):
                     dev_hdd0_game = rpcs3_dir / "dev_hdd0" / "game"
                     if dev_hdd0_game.exists():
                         rpcs3_game_dirs.append(dev_hdd0_game)
+                    games_folder = rpcs3_dir / "games"
+                    if games_folder.exists() and games_folder not in rpcs3_game_dirs:
+                        rpcs3_game_dirs.append(games_folder)
                         
             is_shadps4 = "shadps4" in name.lower() or "shadps4" in emu.get("path", "").lower() or "playstation 4" in [s.lower() for s in emu.get("systems", [])]
             if is_shadps4:
@@ -1330,30 +1337,61 @@ class EmulatorHubWindow(QMainWindow):
                     if path_obj not in rpcs3_game_dirs:
                         rpcs3_game_dirs.append(path_obj)
                         
-        # Now perform the scan on dev_hdd0/game directories
+        # Now perform the scan on dev_hdd0/game and games directories
         for game_folder in rpcs3_game_dirs:
             try:
                 for entry in game_folder.iterdir():
                     if entry.is_dir() and not entry.name.startswith('.'):
-                        # Locate target executable (EBOOT.BIN)
-                        eboot_path = entry / "USRDIR" / "EBOOT.BIN"
-                        target_path = str(eboot_path) if eboot_path.exists() else str(entry)
+                        # Handle both standard (PKG) and disc game folder structures (with PS3_GAME subdirectory)
+                        game_root = entry
+                        if (entry / "PS3_GAME").is_dir():
+                            game_root = entry / "PS3_GAME"
+                            
+                        eboot_path = game_root / "USRDIR" / "EBOOT.BIN"
+                        target_path = str(eboot_path) if eboot_path.exists() else str(game_root)
                         
                         # Get game title from PARAM.SFO offline using our new binary parser!
                         parsed_title = None
-                        sfo_path = entry / "PARAM.SFO"
+                        sfo_path = game_root / "PARAM.SFO"
+                        if not sfo_path.exists() and entry != game_root:
+                            sfo_path = entry / "PARAM.SFO"
+                            
                         if sfo_path.exists():
                             parsed_title = self.parse_param_sfo(str(sfo_path))
                             
                         # Use parsed title, otherwise fall back to serial/folder name
                         title = parsed_title if parsed_title else entry.name
                         
-                        # Check for duplicates in roms_found list
+                        # Check for duplicates in roms_found list (path, title, or serial)
                         already_added = False
+                        current_serial = entry.name.upper()
+                        
                         for r in roms_found:
-                            if r["path"] == target_path:
-                                already_added = True
-                                break
+                            if r.get("platform") == "PlayStation 3":
+                                # 1. Check path
+                                if r["path"] == target_path:
+                                    already_added = True
+                                    break
+                                # 2. Check title match
+                                if r.get("title", "").strip().lower() == title.strip().lower():
+                                    already_added = True
+                                    break
+                                # 3. Check serial/folder name match
+                                r_path = r.get("path", "")
+                                if r_path:
+                                    path_parts = Path(r_path).parts
+                                    r_serial = None
+                                    for part in path_parts:
+                                        cleaned_part = part.replace("-", "").upper()
+                                        if len(cleaned_part) == 9 and cleaned_part.isalnum() and cleaned_part[4:].isdigit():
+                                            r_serial = cleaned_part
+                                            break
+                                    
+                                    cleaned_current = current_serial.replace("-", "")
+                                    if r_serial and len(cleaned_current) == 9 and cleaned_current.isalnum() and cleaned_current[4:].isdigit():
+                                        if r_serial == cleaned_current:
+                                            already_added = True
+                                            break
                                 
                         if not already_added:
                             roms_found.append({
@@ -1363,7 +1401,7 @@ class EmulatorHubWindow(QMainWindow):
                                 "size": 0
                             })
             except Exception as e:
-                print(f"Error scanning RPCS3 dev_hdd0 folder {game_folder}: {e}")
+                print(f"Error scanning RPCS3 folder {game_folder}: {e}")
 
         # Now perform the scan on shadPS4 games directories
         for game_folder in shadps4_game_dirs:
@@ -1686,13 +1724,18 @@ class EmulatorHubWindow(QMainWindow):
             item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, game)
             
-            # Load cover pixmap
-            cover_path = self.config_manager.covers_dir / f"{game['hash']}.jpg"
-            pixmap = QPixmap()
-            if cover_path.exists():
-                pixmap.load(str(cover_path))
+            # Load cover icon — use in-memory cache to avoid repeated disk reads
+            g_hash = game['hash']
+            if g_hash in self._cover_cache:
+                icon = self._cover_cache[g_hash]
+            else:
+                cover_path = self.config_manager.covers_dir / f"{g_hash}.jpg"
+                pixmap = QPixmap()
+                if cover_path.exists():
+                    pixmap.load(str(cover_path))
+                icon = QIcon(pixmap) if not pixmap.isNull() else self.generate_gradient_fallback(game["title"])
+                self._cover_cache[g_hash] = icon
                 
-            icon = QIcon(pixmap) if not pixmap.isNull() else self.generate_gradient_fallback(game["title"])
             item.setData(Qt.ItemDataRole.DecorationRole, icon)
             
             self.games_list.addItem(item)
@@ -1813,8 +1856,15 @@ class EmulatorHubWindow(QMainWindow):
             if enriched:
                 # Emit signal — safely crosses thread boundary via Qt queued connection
                 self.metadata_enriched.emit(game_hash)
+            else:
+                self.metadata_fetch_failed.emit(game_hash, title)
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _invalidate_cover_cache(self, game_hash: str):
+        """Remove a single entry from the cover icon cache so it is reloaded from disk."""
+        self._cover_cache.pop(game_hash, None)
+        self.image_cache.pop(game_hash, None)
 
     def _on_single_enrichment_done(self, game_hash: str):
         """Called on the UI thread after a single game's metadata has been enriched.
@@ -1830,6 +1880,9 @@ class EmulatorHubWindow(QMainWindow):
             gd["igdb_score"] = meta.get("igdb_score", gd.get("igdb_score"))
             gd["igdb_rating_count"] = meta.get("igdb_rating_count", gd.get("igdb_rating_count", 0))
 
+        # Invalidate cover cache so fresh image is shown next repopulate
+        self._invalidate_cover_cache(game_hash)
+
         # 2. If this game is currently shown in the banner, refresh it immediately
         selected = self.games_list.currentItem()
         if selected:
@@ -1840,8 +1893,6 @@ class EmulatorHubWindow(QMainWindow):
                 cover_path = self.config_manager.covers_dir / f"{game_hash}.jpg"
                 pix = QPixmap()
                 if cover_path.exists():
-                    # Clear cached pixmap so fresh cover is loaded
-                    self.image_cache.pop(game_hash, None)
                     pix.load(str(cover_path))
                 favs = self.config_manager.config.get("favorites", [])
                 is_fav = game_hash in favs
@@ -1853,6 +1904,15 @@ class EmulatorHubWindow(QMainWindow):
         # 3. Schedule a debounced full reload (covers grid thumbnails, sidebar counts, etc.)
         #    If more enrichments complete within 600ms, the timer resets — only one reload fires.
         self._refresh_timer.start()
+
+    def _on_metadata_fetch_failed(self, game_hash: str, title: str):
+        """Called on the UI thread if metadata enrichment failed or could not be found."""
+        print(f"[IGDB] Could not find metadata for '{title}' (hash: {game_hash})")
+        selected = self.games_list.currentItem()
+        if selected:
+            sel_data = selected.data(Qt.ItemDataRole.UserRole)
+            if sel_data and sel_data.get("hash") == game_hash:
+                self.statusBar().showMessage(f"❌ Couldn't find game details for '{title}' on IGDB.", 4000)
 
     def on_game_selected(self, item):
         if not item:
@@ -1971,7 +2031,7 @@ class EmulatorHubWindow(QMainWindow):
             if meta_ref:
                 meta_ref["auto_fetch_disabled"] = False
                 self.config_manager.save_config()
-            self.fetch_metadata_in_background(game_data["hash"], game_data["title"])
+            self.fetch_metadata_in_background(game_data["hash"], game_data["title"], platform=game_data.get("platform"))
         elif action == act_manual_search:
             from ui_components import ManualIGDBSearchModal
             modal = ManualIGDBSearchModal(game_data, self.igdb_client, self)
@@ -2828,22 +2888,25 @@ class EmulatorHubWindow(QMainWindow):
         threading.Thread(target=self._quick_scan_worker, daemon=True).start()
 
     def _quick_scan_worker(self):
-        """Background worker that does a fast filesystem-only scan for new games
-        (no IGDB fetch). Games appear immediately and get enriched later when clicked."""
+        """Background worker that does a fast filesystem-only scan for new games.
+        New games are written to metadata immediately so they appear in the library,
+        then an automatic IGDB enrichment batch is kicked off for all new entries."""
         try:
-            new_count = 0
-            
-            # 1. Quick PC game scan (Steam, Epic, Xbox)
+            new_games = []  # list of (g_hash, entry_dict) for newly discovered games
+
+            # ----------------------------------------------------------------
+            # 1. Quick PC game scan (Steam, Epic, Xbox, common folders)
+            # ----------------------------------------------------------------
             steam_games = PCGameScanner.scan_steam_games()
             epic_games = PCGameScanner.scan_epic_games()
             xbox_games = PCGameScanner.scan_xbox_games(self.config_manager.config.get("game_library_paths", []))
             common_games = PCGameScanner.scan_common_game_folders(self.config_manager.config["game_library_paths"])
-            
+
             for pg in steam_games + epic_games + xbox_games + common_games:
                 g_path = pg["path"]
                 g_hash = hashlib.md5(g_path.encode('utf-8')).hexdigest()
                 if g_hash not in self.config_manager.config["game_metadata"]:
-                    self.config_manager.config["game_metadata"][g_hash] = {
+                    entry = {
                         "title": pg["title"],
                         "path": pg["path"],
                         "platform": pg.get("platform", "PC"),
@@ -2857,9 +2920,12 @@ class EmulatorHubWindow(QMainWindow):
                         "game_dir": pg.get("game_dir", ""),
                         "size": 0
                     }
-                    new_count += 1
-            
+                    self.config_manager.config["game_metadata"][g_hash] = entry
+                    new_games.append((g_hash, entry))
+
+            # ----------------------------------------------------------------
             # 2. Quick ROM scan from library paths
+            # ----------------------------------------------------------------
             PLATFORM_SUFFIXES = {
                 ".iso": "PlayStation 2", ".gcz": "GameCube", ".rvz": "GameCube",
                 ".wbfs": "Wii", ".nsp": "Nintendo Switch", ".xci": "Nintendo Switch",
@@ -2872,29 +2938,42 @@ class EmulatorHubWindow(QMainWindow):
                 ".32x": "Sega 32X", ".cdi": "Sega Dreamcast", ".gdi": "Sega Dreamcast",
                 ".sat": "Sega Saturn", ".gg": "Game Gear", ".sms": "Sega Master System",
             }
-            
+
             for path in self.config_manager.config["game_library_paths"]:
                 path_obj = Path(path)
                 if not path_obj.exists():
                     continue
                 for root, dirs, files in os.walk(path):
-                    # Detect PS3 folders
+                    # Detect PS3 disc-based folders (PS3_GAME subfolder)
                     if "PS3_GAME" in dirs:
                         ps3_root = Path(root)
                         ps3_game_dir = ps3_root / "PS3_GAME"
                         eboot_path = ps3_game_dir / "USRDIR" / "EBOOT.BIN"
                         target_path = str(eboot_path) if eboot_path.exists() else str(ps3_game_dir)
+                        # Try to get real title from PARAM.SFO
+                        parsed_title = None
+                        sfo_candidates = [
+                            ps3_game_dir / "PARAM.SFO",
+                            ps3_root / "PARAM.SFO",
+                        ]
+                        for sfo in sfo_candidates:
+                            if sfo.exists():
+                                parsed_title = self.parse_param_sfo(str(sfo))
+                                if parsed_title:
+                                    break
+                        title = parsed_title if parsed_title else ps3_root.name
                         g_hash = hashlib.md5(target_path.encode('utf-8')).hexdigest()
                         if g_hash not in self.config_manager.config["game_metadata"]:
-                            self.config_manager.config["game_metadata"][g_hash] = {
-                                "title": ps3_root.name, "path": target_path,
+                            entry = {
+                                "title": title, "path": target_path,
                                 "platform": "PlayStation 3", "playtime": 0, "sessions": [],
                                 "developer": "Unknown Developer", "release_date": "N/A",
                                 "summary": "Local ROM for PlayStation 3", "cover_image_id": "", "size": 0
                             }
-                            new_count += 1
+                            self.config_manager.config["game_metadata"][g_hash] = entry
+                            new_games.append((g_hash, entry))
                         dirs.remove("PS3_GAME")
-                    
+
                     # Detect PS4 folders (sce_sys)
                     lower_dirs = [d.lower() for d in dirs]
                     if "sce_sys" in lower_dirs:
@@ -2910,15 +2989,16 @@ class EmulatorHubWindow(QMainWindow):
                         target_path = str(ps4_root)
                         g_hash = hashlib.md5(target_path.encode('utf-8')).hexdigest()
                         if g_hash not in self.config_manager.config["game_metadata"]:
-                            self.config_manager.config["game_metadata"][g_hash] = {
+                            entry = {
                                 "title": title, "path": target_path,
                                 "platform": "PlayStation 4", "playtime": 0, "sessions": [],
                                 "developer": "Unknown Developer", "release_date": "N/A",
                                 "summary": "Local ROM for PlayStation 4", "cover_image_id": "", "size": 0
                             }
-                            new_count += 1
+                            self.config_manager.config["game_metadata"][g_hash] = entry
+                            new_games.append((g_hash, entry))
                         dirs.remove(sce_sys_dir)
-                    
+
                     # File suffix scanning
                     for f in files:
                         file_path = Path(root) / f
@@ -2930,19 +3010,169 @@ class EmulatorHubWindow(QMainWindow):
                             target_path = str(file_path)
                             g_hash = hashlib.md5(target_path.encode('utf-8')).hexdigest()
                             if g_hash not in self.config_manager.config["game_metadata"]:
-                                self.config_manager.config["game_metadata"][g_hash] = {
+                                entry = {
                                     "title": file_path.stem, "path": target_path,
                                     "platform": platform, "playtime": 0, "sessions": [],
                                     "developer": "Unknown Developer", "release_date": "N/A",
                                     "summary": f"Local ROM for {platform}", "cover_image_id": "",
                                     "size": file_path.stat().st_size
                                 }
-                                new_count += 1
-            
-            if new_count > 0:
+                                self.config_manager.config["game_metadata"][g_hash] = entry
+                                new_games.append((g_hash, entry))
+
+            # ----------------------------------------------------------------
+            # 3. Scan RPCS3 dev_hdd0/game folders (fixes PS3 new-game detection)
+            # ----------------------------------------------------------------
+            rpcs3_game_dirs = []
+            for name, emu in self.config_manager.config.get("emulators", {}).items():
+                is_rpcs3 = (
+                    "rpcs3" in name.lower() or
+                    "rpcs3" in emu.get("path", "").lower() or
+                    "playstation 3" in [s.lower() for s in emu.get("systems", [])]
+                )
+                if is_rpcs3:
+                    emu_path = emu.get("path", "")
+                    if emu_path and os.path.exists(emu_path):
+                        rpcs3_dir = Path(emu_path).parent
+                        dev_hdd0_game = rpcs3_dir / "dev_hdd0" / "game"
+                        if dev_hdd0_game.exists() and dev_hdd0_game not in rpcs3_game_dirs:
+                            rpcs3_game_dirs.append(dev_hdd0_game)
+                        games_folder = rpcs3_dir / "games"
+                        if games_folder.exists() and games_folder not in rpcs3_game_dirs:
+                            rpcs3_game_dirs.append(games_folder)
+
+            # Also check library paths that point to dev_hdd0
+            for path in self.config_manager.config["game_library_paths"]:
+                path_obj = Path(path)
+                if "dev_hdd0" in str(path_obj).lower():
+                    if path_obj.name.lower() == "dev_hdd0":
+                        candidate = path_obj / "game"
+                        if candidate.exists() and candidate not in rpcs3_game_dirs:
+                            rpcs3_game_dirs.append(candidate)
+                    elif path_obj.name.lower() == "game" and path_obj.parent.name.lower() == "dev_hdd0":
+                        if path_obj not in rpcs3_game_dirs:
+                            rpcs3_game_dirs.append(path_obj)
+
+            for game_folder in rpcs3_game_dirs:
+                try:
+                    for entry in game_folder.iterdir():
+                        if not entry.is_dir() or entry.name.startswith('.'):
+                            continue
+                        game_root = entry
+                        if (entry / "PS3_GAME").is_dir():
+                            game_root = entry / "PS3_GAME"
+                            
+                        eboot_path = game_root / "USRDIR" / "EBOOT.BIN"
+                        target_path = str(eboot_path) if eboot_path.exists() else str(game_root)
+                        g_hash = hashlib.md5(target_path.encode('utf-8')).hexdigest()
+                        if g_hash not in self.config_manager.config["game_metadata"]:
+                            parsed_title = None
+                            sfo_path = game_root / "PARAM.SFO"
+                            if not sfo_path.exists() and entry != game_root:
+                                sfo_path = entry / "PARAM.SFO"
+                                
+                            if sfo_path.exists():
+                                parsed_title = self.parse_param_sfo(str(sfo_path))
+                            title = parsed_title if parsed_title else entry.name
+                            
+                            # Check if this PS3 game is already in the library (under a different path)
+                            is_duplicate = False
+                            current_serial = entry.name.upper()
+                            
+                            for existing_meta in self.config_manager.config["game_metadata"].values():
+                                if existing_meta.get("platform") == "PlayStation 3":
+                                    # 1. Check title match
+                                    if existing_meta.get("title", "").strip().lower() == title.strip().lower():
+                                        is_duplicate = True
+                                        break
+                                    # 2. Check serial/folder name match
+                                    existing_path = existing_meta.get("path", "")
+                                    if existing_path:
+                                        path_parts = Path(existing_path).parts
+                                        existing_serial = None
+                                        for part in path_parts:
+                                            cleaned_part = part.replace("-", "").upper()
+                                            if len(cleaned_part) == 9 and cleaned_part.isalnum() and cleaned_part[4:].isdigit():
+                                                existing_serial = cleaned_part
+                                                break
+                                        
+                                        cleaned_current = current_serial.replace("-", "")
+                                        if existing_serial and len(cleaned_current) == 9 and cleaned_current.isalnum() and cleaned_current[4:].isdigit():
+                                            if existing_serial == cleaned_current:
+                                                is_duplicate = True
+                                                break
+                                                
+                            if is_duplicate:
+                                continue
+                                
+                            meta_entry = {
+                                "title": title, "path": target_path,
+                                "platform": "PlayStation 3", "playtime": 0, "sessions": [],
+                                "developer": "Unknown Developer", "release_date": "N/A",
+                                "summary": "Local ROM for PlayStation 3", "cover_image_id": "", "size": 0
+                            }
+                            self.config_manager.config["game_metadata"][g_hash] = meta_entry
+                            new_games.append((g_hash, meta_entry))
+                except Exception as e:
+                    print(f"Error scanning RPCS3 dev_hdd0/games in quick scan: {e}")
+
+            if not new_games:
+                return
+
+            # Save the skeleton entries so the library shows up immediately
+            self.config_manager.save_config()
+            from PyQt6.QtCore import QMetaObject
+            QMetaObject.invokeMethod(self, "load_game_cache", Qt.ConnectionType.QueuedConnection)
+
+            # ----------------------------------------------------------------
+            # 4. Auto-fetch IGDB metadata for all newly discovered games
+            # ----------------------------------------------------------------
+            if self.igdb_client.is_configured():
+                import concurrent.futures
+
+                def _fetch_new_game_meta(item):
+                    ghash, entry = item
+                    details = self.igdb_client.fetch_game_details(
+                        entry["title"], platform=entry.get("platform")
+                    )
+                    return ghash, entry, details
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                    futures = {executor.submit(_fetch_new_game_meta, item): item for item in new_games}
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            ghash, entry, details = future.result()
+                        except Exception:
+                            continue
+
+                        if not details:
+                            continue
+
+                        meta_ref = self.config_manager.config["game_metadata"].get(ghash)
+                        if not meta_ref:
+                            continue
+
+                        meta_ref["developer"] = details["developer"]
+                        meta_ref["release_date"] = details["release_date"]
+                        meta_ref["summary"] = details["summary"]
+                        meta_ref["igdb_score"] = details.get("igdb_score")
+                        meta_ref["igdb_rating_count"] = details.get("igdb_rating_count", 0)
+
+                        cover_id = details.get("cover_image_id", "")
+                        if cover_id:
+                            meta_ref["cover_image_id"] = cover_id
+                            cover_path = self.config_manager.covers_dir / f"{ghash}.jpg"
+                            try:
+                                self.igdb_client.download_cover(cover_id, cover_path)
+                            except Exception:
+                                pass
+
+                        # Emit signal so banner and grid update on the UI thread
+                        self.metadata_enriched.emit(ghash)
+
+                self.igdb_client.flush_cache()
                 self.config_manager.save_config()
-                from PyQt6.QtCore import QMetaObject
-                QMetaObject.invokeMethod(self, "load_game_cache", Qt.ConnectionType.QueuedConnection)
+
         except Exception as e:
             print(f"Error in quick scan: {e}")
 

@@ -152,6 +152,9 @@ class IGDBClient:
         
         # Check cache first
         cache_key = clean_title.lower()
+        if platform:
+            cache_key = f"{cache_key}_{platform.lower().strip()}"
+            
         if cache_key in self.config_manager.igdb_cache:
             return self.config_manager.igdb_cache[cache_key]
 
@@ -164,108 +167,228 @@ class IGDBClient:
             "Authorization": f"Bearer {self.access_token}"
         }
         
+        # Resolve target platform IDs with normalized lookup
+        target_platform_ids = []
+        if platform:
+            plat_lower = platform.lower().strip()
+            for key, val in self.IGDB_PLATFORM_IDS.items():
+                key_l = key.lower().strip()
+                if (key_l == plat_lower or 
+                    (plat_lower in ["ps3", "playstation 3"] and "playstation 3" in key_l) or 
+                    (plat_lower in ["ps2", "playstation 2"] and "playstation 2" in key_l) or 
+                    (plat_lower in ["ps1", "psx", "playstation 1", "playstation"] and key_l == "playstation") or 
+                    (plat_lower in ["psp", "playstation portable"] and key_l == "psp") or 
+                    (plat_lower in ["snes", "super nintendo"] and "super nintendo" in key_l) or 
+                    (plat_lower in ["nes", "nintendo entertainment system"] and key_l == "nes") or
+                    (plat_lower in ["switch", "nintendo switch"] and "switch" in key_l) or
+                    (plat_lower in ["gc", "gamecube", "nintendo gamecube"] and "gamecube" in key_l) or
+                    (plat_lower in ["wii", "nintendo wii"] and key_l == "wii") or
+                    (plat_lower in ["gba", "game boy advance"] and "game boy advance" in key_l) or
+                    (plat_lower in ["gbc", "game boy color"] and "game boy color" in key_l) or
+                    (plat_lower in ["gb", "game boy"] and key_l == "game boy") or
+                    (plat_lower in ["ds", "nds", "nintendo ds"] and key_l == "nintendo ds") or
+                    (plat_lower in ["3ds", "nintendo 3ds"] and key_l == "nintendo 3ds") or
+                    (plat_lower in ["n64", "nintendo 64"] and "nintendo 64" in key_l)):
+                    target_platform_ids = val
+                    break
+
         # Safe escape title
         escaped_title = clean_title.replace('"', '\\"')
         
-        # Build query: exclude DLCs/addons (category 0 = main game) and optionally filter by platform
-        where_clauses = ["category = 0"]
-        if platform and platform in self.IGDB_PLATFORM_IDS:
-            plat_ids = self.IGDB_PLATFORM_IDS[platform]
-            plat_str = ",".join(str(p) for p in plat_ids)
-            where_clauses.append(f"platforms = ({plat_str})")
+        # Build query variations to try
+        search_targets = [clean_title]
         
-        where_str = " & ".join(where_clauses)
-        body = f'search "{escaped_title}"; fields name, cover.image_id, involved_companies.company.name, involved_companies.developer, first_release_date, summary, genres.name, category, rating, rating_count, aggregated_rating, aggregated_rating_count, total_rating, total_rating_count; where {where_str}; limit 5;'
+        # Fallback to base title if it contains colons or hyphens
+        base_title = None
+        if ":" in clean_title:
+            base_title = clean_title.split(":")[0].strip()
+        elif " - " in clean_title:
+            base_title = clean_title.split(" - ")[0].strip()
+        elif "-" in clean_title:
+            base_title = clean_title.split("-")[0].strip()
+            
+        if base_title and len(base_title) >= 3 and base_title.lower() != clean_title.lower():
+            search_targets.append(base_title)
+            
+        results = None
         
-        try:
-            response = self._session.post(url, headers=headers, data=body, timeout=8)
-            if response.status_code == 200:
-                results = response.json()
+        # We try to run the queries sequentially until we get a list of results
+        for target in search_targets:
+            escaped_target = target.replace('"', '\\"')
+            
+            # Query variations to try for this target
+            queries_to_try = []
+            
+            # Build platform filter string
+            plat_filter = None
+            if target_platform_ids:
+                plat_str = ",".join(str(p) for p in target_platform_ids)
+                plat_filter = f"platforms = ({plat_str})"
+            
+            # Variation 1: Relaxed categories (Main, Remake, Remaster, Expanded, Port) + Platform filter
+            where_clauses = ["category = (0, 8, 9, 10, 11)"]
+            if plat_filter:
+                where_clauses.append(plat_filter)
+            queries_to_try.append(" & ".join(where_clauses))
+            
+            # Variation 2: Relaxed categories, NO platform filter
+            queries_to_try.append("category = (0, 8, 9, 10, 11)")
+            
+            # Variation 3: Completely open search, NO category and NO platform filter
+            queries_to_try.append(None)
+            
+            for where_str in queries_to_try:
+                if where_str:
+                    body = f'search "{escaped_target}"; fields name, cover.image_id, platforms, involved_companies.company.name, involved_companies.developer, first_release_date, summary, genres.name, category, rating, rating_count, aggregated_rating, aggregated_rating_count, total_rating, total_rating_count; where {where_str}; limit 50;'
+                else:
+                    body = f'search "{escaped_target}"; fields name, cover.image_id, platforms, involved_companies.company.name, involved_companies.developer, first_release_date, summary, genres.name, category, rating, rating_count, aggregated_rating, aggregated_rating_count, total_rating, total_rating_count; limit 50;'
                 
-                # If platform filter returned no results, retry without platform filter
-                if (not results or len(results) == 0) and platform and platform in self.IGDB_PLATFORM_IDS:
-                    body_fallback = f'search "{escaped_title}"; fields name, cover.image_id, involved_companies.company.name, involved_companies.developer, first_release_date, summary, genres.name, category, rating, rating_count, aggregated_rating, aggregated_rating_count, total_rating, total_rating_count; where category = 0; limit 5;'
-                    response = self._session.post(url, headers=headers, data=body_fallback, timeout=8)
+                try:
+                    response = self._session.post(url, headers=headers, data=body, timeout=8)
                     if response.status_code == 200:
-                        results = response.json()
-                
-                if results and isinstance(results, list):
-                    # Smart matching: prefer exact case-insensitive match
-                    selected_game = results[0]
-                    target_clean = clean_title.lower()
-                    for game in results:
-                        if not isinstance(game, dict):
-                            continue
-                        g_name = game.get("name", "").lower()
-                        g_clean = re.sub(r'\[.*?\]|\(.*?\)', '', g_name).strip()
-                        # Also strip trademark symbols from IGDB result names
-                        g_clean = re.sub(r'[™®©℠]', '', g_clean).strip()
-                        if g_clean == target_clean:
-                            selected_game = game
+                        res = response.json()
+                        if res and isinstance(res, list) and len(res) > 0:
+                            results = res
                             break
+                    elif response.status_code == 429:
+                        print("IGDB rate limited, backing off...")
+                        time.sleep(0.5)
+                except Exception as e:
+                    print(f"IGDB API query variation failed for target '{target}' with where '{where_str}': {e}")
+            
+            if results:
+                break
+                
+        if results and isinstance(results, list):
+            # Smart matching: rank results based on keyword similarity and platform overlap
+            def get_auto_match_score(game):
+                if not isinstance(game, dict):
+                    return 100
+                g_name = game.get("name", "").lower().strip()
+                q_name = clean_title.lower().strip()
+                
+                # Strip bracket metadata and trademark symbols for score comparison
+                g_clean = re.sub(r'\[.*?\]|\(.*?\)', '', g_name).strip()
+                g_clean = re.sub(r'[™®©℠]', '', g_clean).strip()
+                
+                if g_clean == q_name:
+                    base_score = 0  # Exact match
+                elif g_clean.startswith(q_name):
+                    base_score = 1  # Prefix match
+                else:
+                    q_words = q_name.split()
+                    g_words = g_clean.split()
+                    if all(qw in g_words for qw in q_words):
+                        base_score = 2  # Keyword match (all query words present)
+                    elif q_name in g_clean:
+                        base_score = 3  # Substring match
+                    elif any(qw in g_clean for qw in q_words):
+                        base_score = 4  # Partial match
+                    else:
+                        base_score = 5
+                
+                # Check platform match
+                game_platforms = game.get("platforms", [])
+                game_plat_ids = []
+                if isinstance(game_platforms, list):
+                    for gp in game_platforms:
+                        if isinstance(gp, int):
+                            game_plat_ids.append(gp)
+                        elif isinstance(gp, dict) and "id" in gp:
+                            game_plat_ids.append(gp["id"])
+                
+                has_plat_match = False
+                if target_platform_ids and game_plat_ids:
+                    has_plat_match = any(pid in target_platform_ids for pid in game_plat_ids)
+                
+                # Platform matching prioritization
+                platform_priority = 0
+                if target_platform_ids:
+                    platform_priority = 0 if has_plat_match else 100
                     
-                    game_data = selected_game
+                return base_score + platform_priority
+                
+            results.sort(key=get_auto_match_score)
+            
+            selected_game = None
+            if target_platform_ids:
+                for game in results:
+                    game_platforms = game.get("platforms", [])
+                    game_plat_ids = []
+                    if isinstance(game_platforms, list):
+                        for gp in game_platforms:
+                            if isinstance(gp, int):
+                                game_plat_ids.append(gp)
+                            elif isinstance(gp, dict) and "id" in gp:
+                                game_plat_ids.append(gp["id"])
                     
-                    # Extract developer safely
-                    developer = "Unknown Developer"
-                    companies = game_data.get("involved_companies")
-                    if isinstance(companies, list):
-                        for company_wrapper in companies:
-                            if isinstance(company_wrapper, dict) and company_wrapper.get("developer", False):
-                                company = company_wrapper.get("company")
-                                if isinstance(company, dict):
-                                    developer = company.get("name", "Unknown Developer")
-                                    break
-                    
-                    # Format release date
-                    release_date = "N/A"
-                    if "first_release_date" in game_data:
-                        try:
-                            release_date = datetime.fromtimestamp(game_data["first_release_date"]).strftime('%Y-%m-%d')
-                        except:
-                            pass
-                    
-                    # Format genres safely
-                    genres = []
-                    genre_list = game_data.get("genres")
-                    if isinstance(genre_list, list):
-                        for g in genre_list:
-                            if isinstance(g, dict) and "name" in g:
-                                genres.append(g["name"])
-                    
-                    # Safe cover extraction
-                    cover_data = game_data.get("cover")
-                    cover_id = ""
-                    if isinstance(cover_data, dict):
-                        cover_id = cover_data.get("image_id", "")
-                    
-                    igdb_score = self._extract_igdb_score(game_data)
-                    
-                    details = {
-                        "name": game_data.get("name", clean_title),
-                        "cover_image_id": cover_id,
-                        "developer": developer,
-                        "release_date": release_date,
-                        "summary": game_data.get("summary", "No description available."),
-                        "genres": genres,
-                        "igdb_score": igdb_score,
-                        "igdb_rating_count": game_data.get("rating_count", 0),
-                        "igdb_aggregated_rating": game_data.get("aggregated_rating"),
-                        "igdb_aggregated_rating_count": game_data.get("aggregated_rating_count", 0),
-                        "igdb_total_rating": game_data.get("total_rating"),
-                        "igdb_total_rating_count": game_data.get("total_rating_count", 0)
-                    }
-                    
-                    # Store in cache (batch-save later, not per-game)
-                    self.config_manager.igdb_cache[cache_key] = details
-                    self._cache_dirty = True
-                    return details
-            elif response.status_code == 429:
-                # Rate limited — back off briefly
-                print(f"IGDB rate limited, backing off...")
-                time.sleep(0.5)
-        except Exception as e:
-            print(f"IGDB API query failed for '{clean_title}': {e}")
+                    if any(pid in target_platform_ids for pid in game_plat_ids):
+                        selected_game = game
+                        break
+                
+                if not selected_game:
+                    print(f"[IGDB Auto Fetch] No game matched the target platform '{platform}' IDs {target_platform_ids}.")
+                    return None
+            else:
+                selected_game = results[0]
+            
+            game_data = selected_game
+            
+            # Extract developer safely
+            developer = "Unknown Developer"
+            companies = game_data.get("involved_companies")
+            if isinstance(companies, list):
+                for company_wrapper in companies:
+                    if isinstance(company_wrapper, dict) and company_wrapper.get("developer", False):
+                        company = company_wrapper.get("company")
+                        if isinstance(company, dict):
+                            developer = company.get("name", "Unknown Developer")
+                            break
+            
+            # Format release date
+            release_date = "N/A"
+            if "first_release_date" in game_data:
+                try:
+                    release_date = datetime.fromtimestamp(game_data["first_release_date"]).strftime('%Y-%m-%d')
+                except:
+                    pass
+            
+            # Format genres safely
+            genres = []
+            genre_list = game_data.get("genres")
+            if isinstance(genre_list, list):
+                for g in genre_list:
+                    if isinstance(g, dict) and "name" in g:
+                        genres.append(g["name"])
+            
+            # Safe cover extraction
+            cover_data = game_data.get("cover")
+            cover_id = ""
+            if isinstance(cover_data, dict):
+                cover_id = cover_data.get("image_id", "")
+            
+            igdb_score = self._extract_igdb_score(game_data)
+            
+            details = {
+                "name": game_data.get("name", clean_title),
+                "cover_image_id": cover_id,
+                "developer": developer,
+                "release_date": release_date,
+                "summary": game_data.get("summary", "No description available."),
+                "genres": genres,
+                "igdb_score": igdb_score,
+                "igdb_rating_count": game_data.get("rating_count", 0),
+                "igdb_aggregated_rating": game_data.get("aggregated_rating"),
+                "igdb_aggregated_rating_count": game_data.get("aggregated_rating_count", 0),
+                "igdb_total_rating": game_data.get("total_rating"),
+                "igdb_total_rating_count": game_data.get("total_rating_count", 0)
+            }
+            
+            # Store in cache (batch-save later, not per-game)
+            self.config_manager.igdb_cache[cache_key] = details
+            self._cache_dirty = True
+            return details
+            
         return None
 
     # IGDB category enum -> human-readable name
@@ -289,10 +412,22 @@ class IGDBClient:
 
     def search_games_manual(self, query):
         """Returns a list of raw search results from IGDB for a user to choose from manually.
-        NOTE: IGDB does not support combining 'search' with 'where' field-filters.
-        We fetch all results and let the UI filter by category."""
+        We fetch up to 50 results and rank them by keyword relevance so that exact matches appear first."""
         if not requests or not self.authenticate():
             return []
+
+        # 1. Resolve serial to title if the query is a serial code (e.g. BLES00513)
+        clean_query = query.strip()
+        is_probably_serial_only = bool(re.fullmatch(r'[A-Za-z]{3,4}[-_]?\d{4,5}', clean_query.replace(' ', '')))
+        if is_probably_serial_only or len(clean_query) < 3:
+            serial_match = re.search(r'([A-Z]{3,4})[-_]?([0-9]{4,5})', query.upper())
+            if serial_match:
+                prefix, num = serial_match.groups()
+                serial_code = f"{prefix}-{num}"
+                resolved = self.resolve_serial_to_title(serial_code)
+                if resolved:
+                    print(f"[IGDB Manual Search] Resolved serial '{serial_code}' to '{resolved}'")
+                    query = resolved
 
         url = "https://api.igdb.com/v4/games"
         headers = {
@@ -301,14 +436,14 @@ class IGDBClient:
         }
 
         escaped_title = query.replace('"', '\\"')
-        # No 'where' clause — search + where on game fields is unsupported by IGDB
+        # Fetch up to 50 results for a broader list
         body = (
             f'search "{escaped_title}"; '
             f'fields name, cover.image_id, involved_companies.company.name, '
             f'involved_companies.developer, first_release_date, summary, '
             f'genres.name, category, platforms.name, rating, rating_count, '
             f'aggregated_rating, aggregated_rating_count, total_rating, total_rating_count; '
-            f'limit 20;'
+            f'limit 50;'
         )
 
         results_formatted = []
@@ -378,6 +513,25 @@ class IGDBClient:
         except Exception as e:
             print(f"Error fetching manual search from IGDB: {e}")
 
+        # Smart ranking of keyword results
+        def get_match_score(game_title):
+            g_title = game_title.lower().strip()
+            q_title = query.lower().strip()
+            if g_title == q_title:
+                return 0  # Exact match
+            if g_title.startswith(q_title):
+                return 1  # Prefix match
+            q_words = q_title.split()
+            g_words = g_title.split()
+            if all(qw in g_words for qw in q_words):
+                return 2  # Keyword match (all query words present)
+            if q_title in g_title:
+                return 3  # Substring match
+            if any(qw in g_title for qw in q_words):
+                return 4  # Partial match
+            return 5
+
+        results_formatted.sort(key=lambda x: get_match_score(x["title"]))
         return results_formatted
 
     def flush_cache(self):

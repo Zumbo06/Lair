@@ -1729,7 +1729,20 @@ class ManualIGDBSearchModal(QDialog):
         # ── Row 1: search input + button ──────────────────────────────────
         search_layout = QHBoxLayout()
         self.search_input = QLineEdit()
-        self.search_input.setText(game_data.get("title", ""))
+        
+        # Clean the title aggressively for initial search input
+        import re
+        initial_title = game_data.get("title", "")
+        clean_title = re.sub(r'\[.*?\]|\(.*?\)', '', initial_title).strip()
+        clean_title = re.sub(r'\.(iso|pkg|cso|cue|bin|rom|sfb)$', '', clean_title, flags=re.IGNORECASE).strip()
+        clean_title = clean_title.replace('_', ' ').strip()
+        clean_title = re.sub(r'[™®©℠]', '', clean_title).strip()
+        clean_title = re.sub(r'\s*[-–]\s*Disc\s*\d+', '', clean_title, flags=re.IGNORECASE).strip()
+        clean_title = re.sub(r'\s+v\d+\.\d+.*$', '', clean_title).strip()
+        if not clean_title:
+            clean_title = initial_title
+            
+        self.search_input.setText(clean_title)
         self.search_input.returnPressed.connect(self.perform_search)
         search_layout.addWidget(self.search_input, 1)
 
@@ -1851,7 +1864,7 @@ class ManualIGDBSearchModal(QDialog):
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _apply_filter(self):
+    def _apply_filter(self, *args):
         """Re-populate the list according to the current type filter."""
         if not self._all_results:
             return
