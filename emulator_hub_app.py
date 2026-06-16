@@ -16,7 +16,8 @@ from PyQt6.QtWidgets import (
     QStatusBar, QListWidgetItem, QPushButton, QMessageBox, QFileDialog, QLabel,
     QDialog, QLineEdit, QDialogButtonBox, QSplitter, QComboBox, QTreeWidget,
     QTreeWidgetItem, QCheckBox, QFormLayout, QGroupBox, QStackedWidget, QFrame, QMenu,
-    QTextEdit, QSystemTrayIcon
+    QTreeWidgetItem, QCheckBox, QFormLayout, QGroupBox, QStackedWidget, QFrame, QMenu,
+    QTextEdit, QSystemTrayIcon, QProgressBar
 )
 from PyQt6.QtGui import QFont, QIcon, QPixmap, QColor, QBrush, QPen, QPainter, QLinearGradient, QAction
 from PyQt6.QtCore import Qt, QSize, QRect, pyqtSignal, QTimer
@@ -40,6 +41,11 @@ class EmulatorHubWindow(QMainWindow):
     metadata_enriched = pyqtSignal(str)  # game_hash
     # Emitted from background thread when a single game's metadata enrichment fails/not found
     metadata_fetch_failed = pyqtSignal(str, str)  # game_hash, title
+    
+    # UI feedback signals for background operations
+    scan_started = pyqtSignal(str)
+    scan_finished = pyqtSignal(str)
+    scan_status_update = pyqtSignal(str)
 
     def __init__(self, config_manager: ConfigManager):
         super().__init__()
@@ -58,6 +64,10 @@ class EmulatorHubWindow(QMainWindow):
         # Connect metadata_enriched signal to in-place hot-refresh slot
         self.metadata_enriched.connect(self._on_single_enrichment_done)
         self.metadata_fetch_failed.connect(self._on_metadata_fetch_failed)
+        
+        self.scan_started.connect(self._on_scan_started)
+        self.scan_finished.connect(self._on_scan_finished)
+        self.scan_status_update.connect(self._on_scan_status_update)
 
         # Instantiate logical managers
         self.igdb_client = IGDBClient(
@@ -323,7 +333,23 @@ class EmulatorHubWindow(QMainWindow):
         
         main_layout.addWidget(self.stacked_widget)
         self.setStatusBar(QStatusBar(self))
+        self.status_progress = QProgressBar()
+        self.status_progress.setMaximumWidth(200)
+        self.status_progress.setRange(0, 0)
+        self.status_progress.hide()
+        self.statusBar().addPermanentWidget(self.status_progress)
         self.statusBar().showMessage("Ready.")
+
+    def _on_scan_started(self, msg: str):
+        self.status_progress.show()
+        self.statusBar().showMessage(msg)
+
+    def _on_scan_finished(self, msg: str):
+        self.status_progress.hide()
+        self.statusBar().showMessage(msg, 5000)
+
+    def _on_scan_status_update(self, msg: str):
+        self.statusBar().showMessage(msg)
 
     def create_nav_button(self, label, active=False):
         btn = QPushButton(label)
@@ -1074,9 +1100,11 @@ class EmulatorHubWindow(QMainWindow):
                 QMetaObject.invokeMethod(self, "load_game_cache", Qt.ConnectionType.QueuedConnection)
         except Exception as e:
             print(f"Error in background silent scan: {e}")
+        finally:
+            self.scan_finished.emit()
 
     def trigger_pc_game_autoscan(self):
-        self.statusBar().showMessage("Auto-scanning PC Games folder, Steam, Epic Games, Xbox libraries...")
+        self.scan_started.emit("Auto-scanning PC Games folder, Steam, Epic Games, Xbox libraries...")
         QApplication.processEvents()
         threading.Thread(target=self._run_pc_game_autoscan, daemon=True).start()
 
@@ -1095,11 +1123,29 @@ class EmulatorHubWindow(QMainWindow):
             added_count = 0
             
             games_to_fetch = []
+            existing_paths = set()
+            for meta in self.config_manager.config["game_metadata"].values():
+                if meta.get("path"):
+                    existing_paths.add(os.path.normpath(meta["path"]).lower())
+                if meta.get("game_dir"):
+                    existing_paths.add(os.path.normpath(meta["game_dir"]).lower())
+
             for p_game in all_pc_games:
                 g_path = p_game["path"]
+                g_dir = p_game.get("game_dir", "")
+                norm_path = os.path.normpath(g_path).lower() if g_path else ""
+                norm_dir = os.path.normpath(g_dir).lower() if g_dir else ""
+                
+                if norm_path and norm_path in existing_paths:
+                    continue
+                if norm_dir and norm_dir in existing_paths:
+                    continue
+                    
                 g_hash = hashlib.md5(g_path.encode('utf-8')).hexdigest()
                 if g_hash not in self.config_manager.config["game_metadata"]:
                     games_to_fetch.append((g_hash, p_game))
+                    if norm_path: existing_paths.add(norm_path)
+                    if norm_dir: existing_paths.add(norm_dir)
             
             if games_to_fetch:
                 import concurrent.futures
@@ -1109,6 +1155,8 @@ class EmulatorHubWindow(QMainWindow):
                     details = self.igdb_client.fetch_game_details(pg["title"], platform=pg.get("platform", "PC"))
                     return ghash, pg, details
                     
+                self.scan_status_update.emit(f"Fetching metadata for {len(games_to_fetch)} new PC games...")
+                
                 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                     futures = {executor.submit(fetch_pc_meta, item): item for item in games_to_fetch}
                     for future in concurrent.futures.as_completed(futures):
@@ -1208,7 +1256,7 @@ class EmulatorHubWindow(QMainWindow):
 
     def trigger_full_rom_scan(self):
         # Classic emulator scanner based on standard library folders and platform mapping suffixes
-        self.statusBar().showMessage("Rescanning library directories...")
+        self.scan_started.emit("Rescanning library directories...")
         QApplication.processEvents()
         
         PLATFORM_SUFFIXES = {
@@ -1443,20 +1491,33 @@ class EmulatorHubWindow(QMainWindow):
                             })
             except Exception as e:
                 print(f"Error scanning shadPS4 games folder {game_folder}: {e}")
+        existing_paths = set()
+        for meta in self.config_manager.config["game_metadata"].values():
+            if meta.get("path"):
+                existing_paths.add(os.path.normpath(meta["path"]).lower())
+            if meta.get("game_dir"):
+                existing_paths.add(os.path.normpath(meta["game_dir"]).lower())
+
         added_count = 0
         games_to_fetch = []
         for rom in roms_found:
             g_path = rom["path"]
+            norm_path = os.path.normpath(g_path).lower() if g_path else ""
+            if norm_path and norm_path in existing_paths:
+                continue
+                
             g_hash = hashlib.md5(g_path.encode('utf-8')).hexdigest()
             if g_hash not in self.config_manager.config["game_metadata"]:
                 games_to_fetch.append((g_hash, rom))
+                if norm_path:
+                    existing_paths.add(norm_path)
                 
         if not games_to_fetch:
             self.load_game_cache()
-            self.statusBar().showMessage("No new ROMs found.")
+            self.scan_finished.emit("No new ROMs found.")
             return
         
-        self.statusBar().showMessage(f"Fetching metadata for {len(games_to_fetch)} new ROMs in background...")
+        self.scan_status_update.emit(f"Fetching metadata for {len(games_to_fetch)} new ROMs in background...")
         QApplication.processEvents()
         
         def _rom_fetch_worker():
@@ -1520,6 +1581,7 @@ class EmulatorHubWindow(QMainWindow):
             self.config_manager.save_config()
             from PyQt6.QtCore import QMetaObject
             QMetaObject.invokeMethod(self, "load_game_cache", Qt.ConnectionType.QueuedConnection)
+            self.scan_finished.emit(f"ROM scan complete. Added {added_count} new games.")
         
         threading.Thread(target=_rom_fetch_worker, daemon=True).start()
 
@@ -2269,22 +2331,15 @@ class EmulatorHubWindow(QMainWindow):
         exe_label.setStyleSheet(f"color: {Constants.C_TEXT_MUTED};")
         
         def scan_folder_for_exes(folder_path):
-            """Scan a folder (1 level deep) for .exe files and populate combo."""
+            """Scan a folder recursively for .exe files and populate combo."""
             combo_exe.clear()
             combo_exe.setEnabled(False)
             exe_files = []
             try:
                 folder = Path(folder_path)
-                # Scan root level
-                for f in folder.iterdir():
-                    if f.is_file() and f.suffix.lower() == '.exe':
+                for f in folder.rglob("*.exe"):
+                    if f.is_file():
                         exe_files.append(str(f))
-                # Also scan one level deep for common structures (bin/, game/)
-                for sub in folder.iterdir():
-                    if sub.is_dir() and sub.name.lower() in ('bin', 'binaries', 'game', 'x64', 'win64', 'win32'):
-                        for f in sub.iterdir():
-                            if f.is_file() and f.suffix.lower() == '.exe':
-                                exe_files.append(str(f))
             except Exception:
                 pass
             
@@ -2468,8 +2523,21 @@ class EmulatorHubWindow(QMainWindow):
             
             g_hash = hashlib.md5(resolved_path.encode('utf-8')).hexdigest()
             
-            # Check for duplicates
-            if g_hash in self.config_manager.config["game_metadata"]:
+            # Check for duplicates by hash or normalized path
+            norm_res = os.path.normpath(resolved_path).lower()
+            norm_dir = os.path.normpath(game_dir).lower() if game_dir else ""
+            
+            already_exists = g_hash in self.config_manager.config["game_metadata"]
+            if not already_exists:
+                for meta in self.config_manager.config["game_metadata"].values():
+                    m_path = os.path.normpath(meta.get("path", "")).lower() if meta.get("path") else ""
+                    m_dir = os.path.normpath(meta.get("game_dir", "")).lower() if meta.get("game_dir") else ""
+                    
+                    if (norm_res and norm_res == m_path) or (norm_dir and norm_dir == m_dir):
+                        already_exists = True
+                        break
+
+            if already_exists:
                 QMessageBox.information(self, "Already Exists", f"'{title}' is already in your library.")
                 return
             
@@ -2688,14 +2756,9 @@ class EmulatorHubWindow(QMainWindow):
                 # Folder-based game without a tracking_exe — scan for exe and ask user
                 exe_files = []
                 try:
-                    for f in Path(g_path).iterdir():
-                        if f.is_file() and f.suffix.lower() == '.exe':
+                    for f in Path(g_path).rglob("*.exe"):
+                        if f.is_file():
                             exe_files.append(str(f))
-                    for sub in Path(g_path).iterdir():
-                        if sub.is_dir() and sub.name.lower() in ('bin', 'binaries', 'game', 'x64', 'win64', 'win32'):
-                            for f in sub.iterdir():
-                                if f.is_file() and f.suffix.lower() == '.exe':
-                                    exe_files.append(str(f))
                 except Exception:
                     pass
                     
@@ -2879,19 +2942,20 @@ class EmulatorHubWindow(QMainWindow):
 
     def refresh_library(self):
         """Reload game cache and trigger a quick background scan for any newly added games."""
-        self.statusBar().showMessage("Refreshing library & scanning for new games...")
+        self.scan_started.emit("Refreshing library & scanning for new games...")
         self.load_game_cache()
         # Quick background scan for new games
         threading.Thread(target=self._quick_scan_worker, daemon=True).start()
 
     def _trigger_quick_scan_all(self):
         """Triggered by the SCAN button in library toolbar."""
-        self.statusBar().showMessage("Scanning all library folders for new games...")
+        self.scan_started.emit("Scanning all library folders for new games...")
         QApplication.processEvents()
         threading.Thread(target=self._quick_scan_worker, daemon=True).start()
 
     def _run_quick_rom_scan_startup(self):
         """Silent quick ROM scan at startup."""
+        self.scan_started.emit("Silent quick library scan at startup...")
         threading.Thread(target=self._quick_scan_worker, daemon=True).start()
 
     def _quick_scan_worker(self):

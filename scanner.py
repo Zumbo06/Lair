@@ -71,7 +71,7 @@ class PCGameScanner:
                             # Search for main executable inside the folder
                             exe_path = ""
                             if game_dir.exists():
-                                exe_files = list(game_dir.glob("*.exe")) + list(game_dir.glob("*/*.exe"))
+                                exe_files = list(game_dir.rglob("*.exe"))
                                 if exe_files:
                                     # Select the largest executable or one with common name as the launch tracker target
                                     exe_files.sort(key=lambda x: x.stat().st_size, reverse=True)
@@ -142,10 +142,7 @@ class PCGameScanner:
                 for entry in folder_path.iterdir():
                     if entry.is_dir() and not entry.name.startswith('.'):
                         # Look for largest .exe files in game directory
-                        exe_files = list(entry.glob("*.exe"))
-                        if not exe_files:
-                            # Try 1 level deeper
-                            exe_files = list(entry.glob("*/*.exe"))
+                        exe_files = list(entry.rglob("*.exe"))
                             
                         if exe_files:
                             exe_files.sort(key=lambda x: x.stat().st_size, reverse=True)
@@ -226,8 +223,8 @@ class PCGameScanner:
                     if not entry.is_dir() or entry.name.startswith('.'):
                         continue
 
-                    # Collect executables up to 2 levels deep
-                    exe_files = list(entry.glob("*.exe")) + list(entry.glob("*/*.exe"))
+                    # Collect executables
+                    exe_files = list(entry.rglob("*.exe"))
                     if not exe_files:
                         continue
 
