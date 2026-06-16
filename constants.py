@@ -2,7 +2,7 @@
 
 class Constants:
     VERSION = "3.00"
-    APP_NAME = "EmulatorHub"
+    APP_NAME = "Lair"
     
     # Premium Modern Obsidian & Velvet Violet Theme
     C_BG_DARK = "#0d0e12"           # Obsidian dark background

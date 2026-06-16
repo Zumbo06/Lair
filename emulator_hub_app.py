@@ -98,7 +98,7 @@ class EmulatorHubWindow(QMainWindow):
             
         tray_menu = QMenu()
         
-        show_action = QAction("Show EmulatorHub", self)
+        show_action = QAction("Show Lair", self)
         show_action.triggered.connect(self.showNormal)
         tray_menu.addAction(show_action)
         
@@ -121,7 +121,7 @@ class EmulatorHubWindow(QMainWindow):
             event.ignore()
             self.hide()
             self.tray_icon.showMessage(
-                "EmulatorHub",
+                "Lair",
                 "App minimized to tray. Right-click the icon to quit.",
                 QSystemTrayIcon.MessageIcon.Information,
                 2000
@@ -2541,7 +2541,7 @@ class EmulatorHubWindow(QMainWindow):
                         self, "PS3 Emulator Needed",
                         "You added a PlayStation 3 game! To launch it, go to the EMULATORS tab "
                         "and add RPCS3 as a custom emulator with 'PlayStation 3' as the supported system.\n\n"
-                        "EmulatorHub will then automatically open RPCS3 when you boot this game."
+                        "Lair will then automatically open RPCS3 when you boot this game."
                     )
 
     # =============================================================================
@@ -2753,7 +2753,7 @@ class EmulatorHubWindow(QMainWindow):
         if self.config_manager.config.get("minimize_to_tray_on_launch", False):
             self.hide()
             self.tray_icon.showMessage(
-                "EmulatorHub",
+                "Lair",
                 "App minimized to tray while game is running.",
                 QSystemTrayIcon.MessageIcon.Information,
                 2000
@@ -3484,7 +3484,7 @@ class EmulatorHubWindow(QMainWindow):
                     QMessageBox.information(
                         self, "Executable Selected",
                         f"You selected a directory instead of an executable file.\n\n"
-                        f"EmulatorHub scanned the directory and selected the main emulator executable:\n"
+                        f"Lair scanned the directory and selected the main emulator executable:\n"
                         f"• {chosen.name}"
                     )
                     resolved_exe = str(chosen)
@@ -3602,7 +3602,7 @@ class EmulatorHubWindow(QMainWindow):
                     QMessageBox.information(
                         self, "Executable Selected",
                         f"You selected a directory instead of an executable file.\n\n"
-                        f"EmulatorHub scanned the directory and selected the main emulator executable:\n"
+                        f"Lair scanned the directory and selected the main emulator executable:\n"
                         f"• {chosen.name}"
                     )
                     resolved_exe = str(chosen)

@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QApplication
 import sys
 
 app = QApplication(sys.argv)
-config_dir = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)) / "EmulatorHub"
+config_dir = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)) / "Lair"
 config_path = config_dir / "config.json"
 
 if config_path.exists():

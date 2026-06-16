@@ -1,4 +1,4 @@
-# EmulatorHub v3.00 🎮
+# Lair v3.00 🎮
 
 A premium, all-in-one game library manager for emulated and PC games — featuring IGDB metadata, automatic game scanning, playtime tracking, and a stunning modern UI.
 
@@ -190,7 +190,7 @@ Pillow>=9.0.0    # Enhanced image processing
 ## 🔧 Architecture
 
 ```
-EmulatorHub/
+Lair/
 ├── emulator_hub_app.py    # Main application window & logic
 ├── ui_components.py       # UI delegates, banner, info modal, stats dashboard
 ├── config.py              # Configuration management & persistence

@@ -1,6 +1,6 @@
 @echo off
-title EmulatorHub Launcher
-echo Starting EmulatorHub...
+title Lair Launcher
+echo Starting Lair...
 
 :: Check if virtual environment exists
 if exist "venv\Scripts\activate.bat" (
@@ -9,7 +9,7 @@ if exist "venv\Scripts\activate.bat" (
     python emulator_hub_app.py
     if %errorlevel% neq 0 (
         echo.
-        echo [ERROR] Failed to start EmulatorHub from virtual environment.
+        echo [ERROR] Failed to start Lair from virtual environment.
         pause
     )
     exit /b
@@ -36,7 +36,7 @@ echo Launch failed with quiet fallback. Retrying visibly...
 python emulator_hub_app.py
 if %errorlevel% neq 0 (
     echo.
-    echo [ERROR] Failed to start EmulatorHub. Please check if Python and PyQt6 are installed.
+    echo [ERROR] Failed to start Lair. Please check if Python and PyQt6 are installed.
     echo We recommend running setup.bat to install all dependencies automatically.
     pause
 )

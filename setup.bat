@@ -1,6 +1,6 @@
 @echo off
-title EmulatorHub Setup
-echo Starting EmulatorHub Setup...
+title Lair Setup
+echo Starting Lair Setup...
 
 :: Check for python
 python --version >nul 2>&1
@@ -45,12 +45,12 @@ if /i "%create_shortcut%"=="Y" (
     echo Creating desktop shortcut...
     set SCRIPT="%TEMP%\CreateShortcut.vbs"
     echo Set oWS = WScript.CreateObject("WScript.Shell") > %SCRIPT%
-    echo sLinkFile = "%USERPROFILE%\Desktop\EmulatorHub.lnk" >> %SCRIPT%
+    echo sLinkFile = "%USERPROFILE%\Desktop\Lair.lnk" >> %SCRIPT%
     echo Set oLink = oWS.CreateShortcut(sLinkFile) >> %SCRIPT%
     echo oLink.TargetPath = "%~dp0run.bat" >> %SCRIPT%
     echo oLink.WorkingDirectory = "%~dp0" >> %SCRIPT%
     echo oLink.IconLocation = "%~dp0icons\Gamepad.png" >> %SCRIPT%
-    echo oLink.Description = "Launch EmulatorHub" >> %SCRIPT%
+    echo oLink.Description = "Launch Lair" >> %SCRIPT%
     echo oLink.Save >> %SCRIPT%
     cscript /nologo %SCRIPT%
     del %SCRIPT%

@@ -6,7 +6,17 @@ from PyQt6.QtCore import QStandardPaths
 
 class ConfigManager:
     def __init__(self):
-        config_dir = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)) / "EmulatorHub"
+        old_config_dir = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)) / "EmulatorHub"
+        config_dir = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)) / "Lair"
+        
+        # Migrate old config to new config dir if needed
+        if old_config_dir.exists() and not config_dir.exists():
+            try:
+                old_config_dir.rename(config_dir)
+            except Exception as e:
+                print(f"Failed to migrate config directory: {e}")
+                config_dir = old_config_dir
+                
         self.covers_dir = config_dir / "covers"
         self.cache_dir = self.covers_dir / "cache"
         self.save_states_dir = config_dir / "save_states"
