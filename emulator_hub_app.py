@@ -2943,6 +2943,20 @@ class EmulatorHubWindow(QMainWindow):
     def refresh_library(self):
         """Reload game cache and trigger a quick background scan for any newly added games."""
         self.scan_started.emit("Refreshing library & scanning for new games...")
+
+        # Remove games that no longer exist on disk
+        metadata = self.config_manager.config.get("game_metadata", {})
+        games_to_remove = [
+            g_hash for g_hash, game_data in metadata.items()
+            if game_data.get("path") and not os.path.exists(game_data["path"])
+        ]
+        
+        for g_hash in games_to_remove:
+            del self.config_manager.config["game_metadata"][g_hash]
+            
+        if games_to_remove:
+            self.config_manager.save_config()
+
         self.load_game_cache()
         # Quick background scan for new games
         threading.Thread(target=self._quick_scan_worker, daemon=True).start()
