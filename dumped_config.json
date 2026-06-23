@@ -1,0 +1,659 @@
+{
+    "game_library_paths": [
+        "E:/Oyunlar",
+        "D:\\Xbox",
+        "D:\\DriveCluv",
+        "D:\\games",
+        "C:\\Users\\yhgoz\\Downloads"
+    ],
+    "emulator_search_paths": [
+        "C:\\Users\\yhgoz\\Desktop\\Programlar"
+    ],
+    "emulators": {
+        "[Auto] PCSX2": {
+            "path": "C:/Users/yhgoz/Desktop/Programlar\\pcsx2-v2.3.436-windows-x64-Qt\\pcsx2-qt.exe",
+            "systems": [
+                "PlayStation 2"
+            ],
+            "args": ""
+        },
+        "[Auto] Project64": {
+            "path": "C:/Users/yhgoz/Desktop/Programlar\\Project64 3.0\\Project64.exe",
+            "systems": [
+                "Nintendo 64"
+            ],
+            "args": ""
+        },
+        "[Auto] Ryujinx": {
+            "path": "C:/Users/yhgoz/Desktop/Programlar\\ryujinx-1.3.3-win_x64\\publish\\Ryujinx.exe",
+            "systems": [
+                "Nintendo Switch"
+            ],
+            "args": ""
+        },
+        "RPCS3": {
+            "path": "C:/Users/yhgoz/Desktop/Programlar/rpcs3-v0.0.37-18022-9c93ec0b_win64_msvc/rpcs3.exe",
+            "systems": [
+                "Playstation 3"
+            ],
+            "args": ""
+        },
+        "Cemu": {
+            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\cemu-2.6-windows-x64\\Cemu_2.6\\Cemu.exe",
+            "systems": [
+                "Wii U"
+            ],
+            "args": "-g %ROM%"
+        },
+        "Ryujinx": {
+            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\ryujinx-1.3.3-win_x64\\publish\\Ryujinx.exe",
+            "systems": [
+                "Nintendo Switch"
+            ],
+            "args": "%ROM%"
+        },
+        "shadPS4": {
+            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\shadPS4QtLauncher-win64-qt-2026-04-22-7aea328\\shadPS4.exe",
+            "systems": [
+                "PlayStation 4"
+            ],
+            "args": ""
+        },
+        "Dolphin": {
+            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\dolphin-2603a-x64\\Dolphin-x64\\Dolphin.exe",
+            "systems": [
+                "GameCube",
+                "Wii"
+            ],
+            "args": "/e %ROM%"
+        },
+        "Xenia": {
+            "path": "C:\\Users\\yhgoz\\Downloads\\xenia_manager\\Emulators\\Xenia Canary\\xenia_canary.exe",
+            "systems": [
+                "Xbox 360"
+            ],
+            "args": "%ROM%"
+        }
+    },
+    "custom_covers": {},
+    "game_metadata": {
+        "9760fbaeb250227d6967293a0d28d18e": {
+            "title": "BloodRayne 2: Terminal Cut",
+            "path": "C:\\Program Files\\Epic Games\\BloodRayne2TerminalCJgRrQ\\rayne2.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Terminal Reality",
+            "release_date": "2020-11-20",
+            "summary": "Enhanced and updated for modern systems, this is the definitive edition of Rayne’s second adventure: a blood-soaked rampage of vengeance against the Cult of Kagan, a group led by Rayne's half-siblings that seek to carry out their father Kagan's legacy by creating a new era of vampire supremacy.",
+            "cover_image_id": "co2k6g",
+            "tracking_exe": "C:\\Program Files\\Epic Games\\BloodRayne2TerminalCJgRrQ\\rayne2.exe",
+            "game_dir": "C:\\Program Files\\Epic Games\\BloodRayne2TerminalCJgRrQ",
+            "size": 19359477318
+        },
+        "7fc6267241c09e23443f2a47eec9b4d0": {
+            "title": "GoldenEye 007 (USA)",
+            "path": "E:\\Oyunlar\\Nintendo 64\\GoldenEye 007 (USA).z64",
+            "platform": "Nintendo 64",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Rare",
+            "release_date": "2023-01-26",
+            "summary": "James Bond returns! Relive the timeless gameplay that defined a gaming generation as you guide 007 through a global adventure. Use stealth and force as you see fit to complete your objectives, enjoying achievements and upgraded features that bring Bond to a new age.",
+            "cover_image_id": "coa0y0",
+            "size": 12582912
+        },
+        "c4f0a88f1b8085e5ad337037399d9765": {
+            "title": "Nightshade",
+            "path": "E:\\Oyunlar\\Playstation 2\\Nightshade (USA).iso",
+            "platform": "PlayStation 2",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Sega WOW",
+            "release_date": "2003-12-04",
+            "summary": "A new rift opens between Earth and the evil realm. Unwilling to succumb to the demonic forces threatening Tokyo, the people enlist the talents of Hibana. With her sword in hand, she alone must battle the legion of Hellspawn and return peace to Earth.\n\nUnleash chain attacks to destroy countless enemies.\nCrush evil with powerful Ninja Magic.\nExecute devastating mid-air assaults and defense maneuvers.\nFight atop fighter jets, moving trucks, and more.\n\nNightshade is the direct sequel to the 2002 Shinobi revival and follows the exploits of a kunoichi, a female shinobi, named Hibana.",
+            "cover_image_id": "co1oxv",
+            "size": 3844898816,
+            "auto_fetch_disabled": false,
+            "igdb_score": 60.7,
+            "igdb_rating_count": 0
+        },
+        "457ff011cf2833b8d0b31fc76b6fddd4": {
+            "title": "Turok - Evolution (USA)",
+            "path": "E:\\Oyunlar\\Playstation 2\\Turok - Evolution (USA).iso",
+            "platform": "PlayStation 2",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Acclaim Studios Austin",
+            "release_date": "2002-08-28",
+            "summary": "Get locked and loaded in an exciting prequel to the Turok series. Turok: Evolution is an epic adventure set against the backdrop of living jungles, mysterious temples, and deadly dinosaurs. Battle over 32 types of dinosaurs as Tal'Set, a warrior caught in the midst of a brutal war in the Lost Land. Use your arsenal of all-new weapons including Variable Payload Cruise Missiles, Gravity Disruptor beams, and the Swarm Bore. Soar through the skies on a winged Quetzalcoatlus, or set out on foot on of the lush interactive environments. Experience an adventure before time.",
+            "cover_image_id": "co1p3p",
+            "size": 2195750912
+        },
+        "52713db27eb37e847b4898268c7b656e": {
+            "title": "Darkwatch",
+            "path": "E:\\Oyunlar\\Playstation 2\\Darkwatch (USA)\\Darkwatch (USA)\\Darkwatch (USA).iso",
+            "platform": "PlayStation 2",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "High Moon Studios",
+            "release_date": "Aug 16, 2005",
+            "summary": "Darkwatch mixes the Western, horror and steampunk genres, telling the story of Jericho Cross, an outlaw gunfighter in the late 19th-century American Frontier who has been turned into a vampire and forcibly recruited by the titular monster-hunting secret organization to fight against supernatural forces.",
+            "cover_image_id": "co4oep",
+            "size": 4653514752
+        },
+        "6cdeee90f4297d885f9cbfe948f1d625": {
+            "title": "Pirates of the Caribbean - The Legend of Jack Sparrow (USA)",
+            "path": "E:\\Oyunlar\\Playstation 2\\Pirates of the Caribbean - The Legend of Jack Sparrow (USA)\\Pirates of the Caribbean - The Legend of Jack Sparrow (USA).iso",
+            "platform": "PlayStation 2",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "7 Studios",
+            "release_date": "2006-06-28",
+            "summary": "Pirates of the Caribbean: The Legend of Jack Sparrow is an action-adventure video game by American developer 7 Studios for the PlayStation 2 and Microsoft Windows. It features playable levels based on the experiences of Captain Jack Sparrow, voiced by Johnny Depp who portrays him in the movies, after the events of Pirates of the Caribbean: The Curse of the Black Pearl. The game includes action, puzzles and humorous cutscenes.",
+            "cover_image_id": "co7npc",
+            "size": 4673699840,
+            "auto_fetch_disabled": false
+        },
+        "ebb12998dd7eaedc87556359924d33a9": {
+            "title": "Primal (USA)",
+            "path": "E:\\Oyunlar\\Playstation 2\\Primal (USA)\\Primal (USA).iso",
+            "platform": "PlayStation 2",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "SCE Cambridge Studio",
+            "release_date": "2003-03-25",
+            "summary": "Primal tells the story of Jennifer Tate, a 21-year-old woman searching for her boyfriend through a series of demonic realms. As the story develops, more is revealed about Jen's past and her relationship with her boyfriend, as well as the nature of the demon worlds.\n\nIn Primal, the player can control either Jen or Scree as they navigate the realms of Oblivion. As the game progresses, newer demonic forms are obtained, which prove invaluable in solving various puzzles and combat.\n\nControl can be switched between Jen and Scree at any time in game. When in control of one, the other will be operated by AI, performing various functions depending on the situation. During play, the characters can interact with one another, performing actions such as asking questions, or siphoning energy.\n\nWhen in control of Jen, the player may transform into one of four demonic forms for various purposes, depending on the situation (provided the forms are unlocked). When in a demon form, Jen experiences a boost in attack, defense, speed, attack range and access to abilities unavailable in a human form. The tattoo on Jen's back also glows when in a demon form, corresponding to various forms.\n\nDefeating enemies involves weakening enemies to the point where their hit points reach zero, at which time a finishing move must be performed to kill the enemy. While the moves differ in style and time taken, the final effect remains the same. Enemies can be finished off before the health bar reaches zero, and doing so leaves more residual energy.\n\nWhile Jen can remain in a demonic form indefinitely, taking damage will reduce health. However, hit points here are represented by demonic energy. When an enemy is killed, the remaining energy can be drained through use of Scree, who can store the energy for when it is needed. Jen can then call on the energy, siphoning it off to replenish her own. Scree can store a vast amount of energy, but also has limits as to how much.\n\nWhen in control of Scree, the player is invulnerable; Scree, being a gargoyle, cannot suffer damage, making him an effective scout. Scree is capable of climbing on stone walls, a necessary ability when traversing the realms. Scree can also store drained energy from dead enemies, which can be used to replenish Jen's demonic health, though he must remain immobile when doing so.\n\nScree is revealed to be the long-lost Abdizur, who disappeared following an encounter with the lord of Chaos. In Solus, for a temporary amount of time, the player possesses a life-size statue of Abdizur via Scree, to combat Belhazur when Jen's powers are not fit to do so. The player may also possess other statues in an area under given circumstances.\n\nThe player may also happen across various energy crystals, which can be stored and used if Scree's energy reserves are not enough and the player is at low health. These crystals are kept throughout the game, the only exclusion being when revisiting previous scenes, at which point they are reduced to a default amount. This means that the crystals function as extra lives, to a degree.\n\nIf Jen is in human form, her health replenishes automatically if she is not in battle (human form only; demon energy must be replenished by either drawing on Scree's reserve energy or, failing that, by using a crystal). While in human form, Jen's health represents her presence in the demon world. If she loses all her health while in human form, she is returned to the human world, where she is in a near-death state. When this happens, the player must direct Scree to the nearest rift gate within a time limit (not seen on screen, though the voice of Arella warns the player that time is running out). If Scree does not reach a rift gate in time, Jen dies, and the game is over.\n\nThroughout the game, constant saving can prove onerous, particularly if the player wishes to backtrack and revisit certain areas. Provided a save game is present, the player may do so, and can revisit nearly all of the locations, once they have been unlocked via an in-game cutscene.",
+            "cover_image_id": "co1oye",
+            "size": 3974070272
+        },
+        "e4b89a10b26439cd1312d037ebe249bb": {
+            "title": "Tenchu - Fatal Shadows (USA)",
+            "path": "E:\\Oyunlar\\Playstation 2\\Tenchu - Fatal Shadows (USA)\\Tenchu - Fatal Shadows (USA).iso",
+            "platform": "PlayStation 2",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "FromSoftware",
+            "release_date": "2004-07-22",
+            "summary": "Two black-clad ninjas, Ayame and Rin, silently stalk enemies and strike with brutal Stealh kills in revenge for the massacre of Rin's village. With lethal blades and their own specialized attacks, the fierce assassins draw ever closer to discovering who ordered this heinous crime.",
+            "cover_image_id": "co1p2d",
+            "size": 3853975552
+        },
+        "c6e12680b3e5a777bef0abb479cd7b71": {
+            "title": "WRC II Extreme (Europe, Australia) (En,Fr,De,Es,It,Pt,Fi)",
+            "path": "E:\\Oyunlar\\Playstation 2\\WRC II Extreme (Europe, Australia) (En,Fr,De,Es,It,Pt,Fi)\\WRC II Extreme (Europe, Australia) (En,Fr,De,Es,It,Pt,Fi).iso",
+            "platform": "PlayStation 2",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Evolution Studios",
+            "release_date": "2002-11-29",
+            "summary": "WRC II Extreme is a 2002 off-road video game released for the PlayStation 2. The game was developed by Evolution Studios and published by Sony Computer Entertainment Europe.",
+            "cover_image_id": "co48x0",
+            "size": 4175036416
+        },
+        "a416258766718a324c6d124abbe18b8c": {
+            "title": "Marvel's Spider-Man 2",
+            "path": "D:\\Games\\Marvel's.Spider-Man.2.Digital.Deluxe.Edition-InsaneRamZes\\Spider-Man2.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Insomniac Games",
+            "release_date": "Oct 20, 2023",
+            "summary": "Marvel's Spider-Man 2 is an action-adventure game developed by Insomniac Games and published by Sony Interactive Entertainment. Released in October 2023 exclusively for the PlayStation 5, it is a direct sequel to Marvel's Spider-Man (2018) and Marvel's Spider-Man: Miles Morales (2020). The game continues the story of Peter Parker and Miles Morales as they face new challenges and threats in New York City.\n\nIn Marvel's Spider-Man 2, players can switch between Peter and Miles, each with unique abilities and combat styles. The game introduces new villains, including Kraven the Hunter and Venom, while expanding the open-world environment with more detailed and interactive elements.",
+            "cover_image_id": "cobg1k",
+            "tracking_exe": "D:\\Games\\Marvel's.Spider-Man.2.Digital.Deluxe.Edition-InsaneRamZes\\Spider-Man2.exe",
+            "game_dir": "D:\\Games\\Marvel's.Spider-Man.2.Digital.Deluxe.Edition-InsaneRamZes",
+            "size": 148089240288,
+            "auto_fetch_disabled": false
+        },
+        "c0c8d47f62c4a8f58fb23f7e3ca703d3": {
+            "title": "ASURA'S WRATH",
+            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\rpcs3-v0.0.37-18022-9c93ec0b_win64_msvc\\dev_hdd0\\game\\BLUS30721\\USRDIR\\EBOOT.BIN",
+            "platform": "PlayStation 3",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "CyberConnect2",
+            "release_date": "2012-02-21",
+            "summary": "The game follows the title character, the demigod Asura as he seeks revenge on the pantheon of other demigods who betrayed him. The story is presented in the style and format of an episodic series of cinematic shorts, including opening and closing credits, with the gameplay being integrated into the cinematic where players switch between third-person combat and interactive sequences with player input in the form of quick-time event button prompts. Because of its unique style, the game has been described in the media as an \"interactive anime\". According to the game's producer Kazuhiro Tsuchiya, Asura's Wrath takes elements from Hinduism and Buddhism and blends them with science fiction, with the main character based on the ever combative and superiority-seeking beings of the same name that are part of the Hindu and Buddhist cosmology.",
+            "cover_image_id": "co4961",
+            "size": 27144208
+        },
+        "faa5720d8c7eb0b4f750c3bbf3890ba3": {
+            "title": "Drakengard 3",
+            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\rpcs3-v0.0.37-18022-9c93ec0b_win64_msvc\\dev_hdd0\\game\\NPUB31251\\USRDIR\\EBOOT.BIN",
+            "platform": "PlayStation 3",
+            "playtime": 229.88266372680664,
+            "sessions": [
+                {
+                    "timestamp": 1780497062.2385187,
+                    "duration": 229.88266372680664
+                }
+            ],
+            "developer": "Access Games",
+            "release_date": "2013-12-19",
+            "summary": "Drakengard 3 transports players to a medieval world where six goddess-like sisters known as \"Intoners\" have brought peace to the earth with their power to manipulate magic through song. Harmony is disrupted, however, when the eldest sister, Zero, attempts to murder her younger sisters with the help of her dragon companion, Mikhail. As the story progresses, players find themselves in a battle to unravel the mystery of Zero and learn her true intentions.\n\nA prequel to the original Drakengard, Drakengard 3 features the series’ signature brand of action, pitting players against hordes of fiends and foes in remorseless hack-and-slash ground combat, and then sending them soaring for pitched aerial battles on the back of the dragon Mikhail.",
+            "cover_image_id": "co25oy",
+            "size": 10210976
+        },
+        "47c76adc394d83aa765e6af7e2eae154": {
+            "title": "Crash Team Racing Nitro-Fueled",
+            "path": "D:\\DriveCluv\\CUSA14876",
+            "platform": "PlayStation 4",
+            "playtime": 191.84471893310547,
+            "sessions": [
+                {
+                    "timestamp": 1780852469.9869945,
+                    "duration": 25.8628933429718
+                },
+                {
+                    "timestamp": 1780853264.428724,
+                    "duration": 27.791446685791016
+                },
+                {
+                    "timestamp": 1780853727.674137,
+                    "duration": 30.069549560546875
+                },
+                {
+                    "timestamp": 1780853918.9724183,
+                    "duration": 32.859930992126465
+                },
+                {
+                    "timestamp": 1780853969.2024024,
+                    "duration": 30.12693762779236
+                },
+                {
+                    "timestamp": 1780854003.8935053,
+                    "duration": 30.542406797409058
+                },
+                {
+                    "timestamp": 1780854574.8269422,
+                    "duration": 14.591553926467896
+                }
+            ],
+            "developer": "Beenox",
+            "release_date": "2019-06-21",
+            "summary": "Crash Team Racing Nitro-Fueled is a kart racing game developed by Beenox and published by Activision. It is a remaster of Crash Team Racing, which was originally developed by Naughty Dog for the PlayStation.",
+            "cover_image_id": "co2wvy",
+            "size": 14350488779
+        },
+        "fe6d2d927f23c692f4e0a5daa1b0e0b9": {
+            "title": "Crash™ Team Racing Nitro-Fueled",
+            "path": "D:\\DriveCluv\\CUSA14876-patch",
+            "platform": "PlayStation 4",
+            "playtime": 28.640321016311646,
+            "sessions": [
+                {
+                    "timestamp": 1780853981.6954532,
+                    "duration": 28.640321016311646
+                }
+            ],
+            "developer": "Beenox",
+            "release_date": "2019-06-21",
+            "summary": "Crash Team Racing Nitro-Fueled is a kart racing game developed by Beenox and published by Activision. It is a remaster of Crash Team Racing, which was originally developed by Naughty Dog for the PlayStation.",
+            "cover_image_id": "co2wvy",
+            "size": 9540354938
+        },
+        "0bc127fed6bf7b2d30eb2b9bbe4ac5c7": {
+            "title": "ShadPs4Plus-PkgExtractor-1.1-windows",
+            "path": "D:\\DriveCluv\\ShadPs4Plus-PkgExtractor-1.1-windows\\pkg_extractor.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "D:\\DriveCluv\\ShadPs4Plus-PkgExtractor-1.1-windows\\pkg_extractor.exe",
+            "game_dir": "D:\\DriveCluv\\ShadPs4Plus-PkgExtractor-1.1-windows",
+            "size": 2959913
+        },
+        "b4d753fa9e74c1c5ba17ba3692b750b5": {
+            "title": "Saints Row: The Third Remastered",
+            "path": "D:\\games\\SaintsRowTheThird\\SRTTR.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Volition",
+            "release_date": "May 22, 2020",
+            "summary": "Saints Row: The Third Remastered gives you control of the Saints at the height of their power, and you live the life to show for it. This is your City. These are your rules.\nRemastered with enhanced graphics, Steelport the original city of sin, has never looked so good as it drowns in sex, drugs and guns.\nYears after taking Stilwater for their own, the Third Street Saints have evolved from street gang to household brand name, with Saints sneakers, Saints energy drinks and Johnny Gat bobblehead dolls all available at a store near you. The Saints are kings of Stilwater, but their celebrity status has not gone unnoticed. The Syndicate, a legendary criminal fraternity with pawns in play all over the globe, has turned its eye on the Saints and demands tribute.\nRefusing to kneel to the Syndicate, you take the fight to Steelport, a once-proud metropolis reduced to a struggling city of sin under Syndicate control. Take a tank skydiving, call in a satellite-targeted airstrike on a Mexican wrestling gang, and fight against a highly-trained military force by your lonesome in the most outlandish gameplay scenarios ever seen.\nWeapons of Crass Destruction – It’s one thing to defeat your enemies. It’s another to humiliate them. Hover jets, human cannonball cars and outrageous melee weapons are all part of the fun.\nCrazy Character Customisation – Create the most outlandish characters ever seen, from washed-up celebrities to maskless ninja pirates. Inside every sinner, there is a Saint. Who will you become?\nOver The Top Co-op – Fly solo or play online with a homie. Give freefall skydiving a try, landing in your partner’s flaming pickup as you make a desperate run toward a heavily armed Syndicate base. Steelport is always more fun with a friend.\nAll DLC included – All three expansion mission packs and 30 pieces of DLC from the original version.",
+            "cover_image_id": "co22r7",
+            "igdb_score": 72.0,
+            "igdb_rating_count": 32,
+            "tracking_exe": "D:\\games\\SaintsRowTheThird\\SRTTR.exe",
+            "game_dir": "D:\\games\\SaintsRowTheThird",
+            "size": 49781119364,
+            "auto_fetch_disabled": false
+        },
+        "51a0f01f36b9e58a82e11cca72fadc87": {
+            "title": "SaintsRowTheThird",
+            "path": "D:\\Games\\SaintsRowTheThird\\SRTTR.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "D:\\Games\\SaintsRowTheThird\\SRTTR.exe",
+            "game_dir": "D:\\Games\\SaintsRowTheThird",
+            "size": 49781119364
+        },
+        "aeac7133a269a50d8d0519fcab0ee0d5": {
+            "title": "God Hand",
+            "path": "E:\\Oyunlar\\Playstation 2\\God Hand (USA)\\God Hand (USA).iso",
+            "platform": "PlayStation 2",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Clover Studio",
+            "release_date": "Sep 14, 2006",
+            "summary": "THERE AIN'T NO JUSTICE IN THE\nWILD, WEIRD WEST. JUST YOU.\nThings can't get any worse after demonic thugs cut your arm off, right? Dead wrong, partner. The lady you saved from them has only gone and given you the legendary GOD HAND as a replacement - the ultimate hand-to-hand weapon. Every undead outlaw in a Stetson, rootin' tootin' demon and circus freak in the prairies is going to want to fight you for it. Welcome to the town of Asskickin... have a nice stay y'all.\n\nBIG HAND - Explosive martial arts and hand-to-hand action get in your face and ugly. No bullets, lots of bruised knuckles.\n\nSLAP STICKS - Totally customisable fight system. Pull off the most outrageous combo moves ever with awesome God Hand powers - punch your opponent into orbit!\n\nFIGHTING FORM - Pugilistic adventure from the makers of RESIDENT EVIL, DEVIL MAY CRY and VIEWTIFUL JOE!",
+            "cover_image_id": "co55n7",
+            "size": 1567686656,
+            "auto_fetch_disabled": false,
+            "igdb_score": 73.0,
+            "igdb_rating_count": 75
+        },
+        "b8e4e536a320b68e83e6c179a53aa893": {
+            "title": "TEST12345",
+            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\rpcs3-v0.0.37-18022-9c93ec0b_win64_msvc\\dev_hdd0\\game\\TEST12345",
+            "platform": "PlayStation 3",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local ROM for PlayStation 3",
+            "cover_image_id": "",
+            "size": 0
+        },
+        "51d92da7dbae9be6dfe8afe4aded46b7": {
+            "title": "＄locks",
+            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\rpcs3-v0.0.37-18022-9c93ec0b_win64_msvc\\dev_hdd0\\game\\＄locks",
+            "platform": "PlayStation 3",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local ROM for PlayStation 3",
+            "cover_image_id": "",
+            "size": 0
+        },
+        "95f5953212f29c8ab475d78ace15a143": {
+            "title": "shortcuts",
+            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\rpcs3-v0.0.37-18022-9c93ec0b_win64_msvc\\games\\shortcuts",
+            "platform": "PlayStation 3",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Race against opponents, and stack up all the floorboards you can pick up along the way!\nIf you're clever enough, get out of the way and build bridges and take shortcuts to get to the finish line before everyone else!",
+            "cover_image_id": "",
+            "size": 4714,
+            "igdb_score": null,
+            "igdb_rating_count": 0
+        },
+        "fdb175cb0e6251665d3f138f2987bbb6": {
+            "title": "Marvel's.Spider-Man.2.Digital.Deluxe.Edition-InsaneRamZes",
+            "path": "D:\\games\\Marvel's.Spider-Man.2.Digital.Deluxe.Edition-InsaneRamZes\\Spider-Man2.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "D:\\games\\Marvel's.Spider-Man.2.Digital.Deluxe.Edition-InsaneRamZes\\Spider-Man2.exe",
+            "game_dir": "D:\\games\\Marvel's.Spider-Man.2.Digital.Deluxe.Edition-InsaneRamZes",
+            "size": 148089240288
+        },
+        "36b8cec915db1e23d5cf4dc0dc81ba6f": {
+            "title": "Gears of War 2",
+            "path": "C:\\Users\\yhgoz\\Downloads\\Gears of War 2 (Europe) (En,Fr,De,Es,It,Zh,Ko,Pl,Ru,Cs,Hu) (En,Es,It)\\Gears of War 2 (Europe) (En,Fr,De,Es,It,Zh,Ko,Pl,Ru,Cs,Hu) (En,Es,It).iso",
+            "platform": "Xbox 360",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Epic Games",
+            "release_date": "2008-11-07",
+            "summary": "In Gears of War 2, The COG continues its fight against the Locust horde, who are attempting to sink all of the cities on the planet Sera by using a big riftworm to eat the ground beneath them. Sergeant Marcus Fenix leads Delta Squad into the depths of the planet to try to stop the worm from eating but instead they discover the true intent of the Locust actions.",
+            "cover_image_id": "co28gg",
+            "igdb_score": 90.4,
+            "igdb_rating_count": 440,
+            "size": 7835492352,
+            "auto_fetch_disabled": false
+        },
+        "88ed70007ad2ed2701dcd1e6cfc1234c": {
+            "title": "Outlast 2",
+            "path": "D:\\games\\juneberryPublic\\Binaries/Win64/Outlast2.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Red Barrels",
+            "release_date": "2017-04-25",
+            "summary": "Outlast 2 is the sequel to the acclaimed survival horror game Outlast. Set in the same universe as the first game, but with different characters and a different setting, Outlast 2 is a twisted new journey into the depths of the human mind and its dark secrets. No conflict is ever black and white.",
+            "cover_image_id": "co20x8",
+            "tracking_exe": "D:\\games\\juneberryPublic\\Binaries/Win64/Outlast2.exe",
+            "game_dir": "D:\\games\\juneberryPublic",
+            "size": 27272594799,
+            "igdb_score": 77.9,
+            "igdb_rating_count": 237,
+            "auto_fetch_disabled": false
+        },
+        "c4bed5bc019c2f1c823e21a8f2884ade": {
+            "title": "juneberryPublic",
+            "path": "D:\\Games\\juneberryPublic\\Prerequisites\\directx_Jun2010_redist.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "D:\\Games\\juneberryPublic\\Prerequisites\\directx_Jun2010_redist.exe",
+            "game_dir": "D:\\Games\\juneberryPublic",
+            "size": 27272594799
+        },
+        "9409da11177f594b2ff669b3dacdeea0": {
+            "title": "juneberryPublic",
+            "path": "D:\\games\\juneberryPublic\\Prerequisites\\directx_Jun2010_redist.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "D:\\games\\juneberryPublic\\Prerequisites\\directx_Jun2010_redist.exe",
+            "game_dir": "D:\\games\\juneberryPublic",
+            "size": 27272594799
+        },
+        "57ec978762699b1ba9ac3b6b80102050": {
+            "title": "1964_GEPD_Edition",
+            "path": "C:\\Users\\yhgoz\\Downloads\\1964_GEPD_Edition\\1964\\1964.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "C:\\Users\\yhgoz\\Downloads\\1964_GEPD_Edition\\1964\\1964.exe",
+            "game_dir": "C:\\Users\\yhgoz\\Downloads\\1964_GEPD_Edition",
+            "size": 77728778
+        },
+        "eb4166d655ac67c95dcce4ed5db3314b": {
+            "title": "DLSS.Swapper-1.2.4.0-portable",
+            "path": "C:\\Users\\yhgoz\\Downloads\\DLSS.Swapper-1.2.4.0-portable\\DLSS Swapper.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "C:\\Users\\yhgoz\\Downloads\\DLSS.Swapper-1.2.4.0-portable\\DLSS Swapper.exe",
+            "game_dir": "C:\\Users\\yhgoz\\Downloads\\DLSS.Swapper-1.2.4.0-portable",
+            "size": 394705695
+        },
+        "468d3df6fd3d2aad8ebb46f08d115cf3": {
+            "title": "nvidiaProfileInspector",
+            "path": "C:\\Users\\yhgoz\\Downloads\\nvidiaProfileInspector\\nvidiaProfileInspector.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "C:\\Users\\yhgoz\\Downloads\\nvidiaProfileInspector\\nvidiaProfileInspector.exe",
+            "game_dir": "C:\\Users\\yhgoz\\Downloads\\nvidiaProfileInspector",
+            "size": 1240221
+        },
+        "df8c7c731e25f112e3becc0c754193c1": {
+            "title": "Steamworks Common Redistributables",
+            "path": "steam://rungameid/228980",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "c:\\program files (x86)\\steam\\steamapps\\common\\Steamworks Shared\\_CommonRedist\\DotNet\\4.8\\ndp48-x86-x64-allos-enu.exe",
+            "game_dir": "c:\\program files (x86)\\steam\\steamapps\\common\\Steamworks Shared",
+            "size": 480820079
+        },
+        "f9e4d0e363794d12db5a50df88ce957b": {
+            "title": "Wallpaper Engine",
+            "path": "steam://rungameid/431960",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "c:\\program files (x86)\\steam\\steamapps\\common\\wallpaper_engine\\wallpaper64.exe",
+            "game_dir": "c:\\program files (x86)\\steam\\steamapps\\common\\wallpaper_engine",
+            "size": 2488224986
+        },
+        "d9556f6494f9e3778f227c0bcb35c938": {
+            "title": "Lossless Scaling",
+            "path": "steam://rungameid/993090",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "c:\\program files (x86)\\steam\\steamapps\\common\\Lossless Scaling\\LosslessScaling.exe",
+            "game_dir": "c:\\program files (x86)\\steam\\steamapps\\common\\Lossless Scaling",
+            "size": 183809856
+        },
+        "bddd21f80e7b67df61973fb0ece23302": {
+            "title": "Batman™: Arkham Knight",
+            "path": "steam://rungameid/208650",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "D:\\SteamLibrary\\steamapps\\common\\Batman Arkham Knight\\Binaries\\Win64\\BatmanAK.exe",
+            "game_dir": "D:\\SteamLibrary\\steamapps\\common\\Batman Arkham Knight",
+            "size": 57926273889
+        },
+        "613c0c1cb83a7a622cdcb485fe4e7d6c": {
+            "title": "CHRONO TRIGGER",
+            "path": "steam://rungameid/613830",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "D:\\SteamLibrary\\steamapps\\common\\Chrono Trigger\\Chrono Trigger.exe",
+            "game_dir": "D:\\SteamLibrary\\steamapps\\common\\Chrono Trigger",
+            "size": 864134161
+        },
+        "0ac24c11fe489f2c43ac2b3be0fa4c19": {
+            "title": "Tales of Arise",
+            "path": "steam://rungameid/740130",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "D:\\SteamLibrary\\steamapps\\common\\Tales of Arise\\Arise\\Binaries\\Win64\\Tales of Arise.exe",
+            "game_dir": "D:\\SteamLibrary\\steamapps\\common\\Tales of Arise",
+            "size": 52214400799
+        },
+        "45d5c783dbe95e5df28ee1d29640030e": {
+            "title": "juneberryPublic",
+            "path": "D:\\Games\\juneberryPublic\\Binaries\\Win64\\Outlast2.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "D:\\Games\\juneberryPublic\\Binaries\\Win64\\Outlast2.exe",
+            "game_dir": "D:\\Games\\juneberryPublic",
+            "size": 27272594799
+        },
+        "4a3075645d95909b88013681b4bc95a5": {
+            "title": "juneberryPublic",
+            "path": "D:\\games\\juneberryPublic\\Binaries\\Win64\\Outlast2.exe",
+            "platform": "PC",
+            "playtime": 0,
+            "sessions": [],
+            "developer": "Unknown Developer",
+            "release_date": "N/A",
+            "summary": "Local PC Game",
+            "cover_image_id": "",
+            "tracking_exe": "D:\\games\\juneberryPublic\\Binaries\\Win64\\Outlast2.exe",
+            "game_dir": "D:\\games\\juneberryPublic",
+            "size": 27272594799
+        }
+    },
+    "theme": "Modern Dark",
+    "view_mode": "grid",
+    "grid_icon_size": 150,
+    "favorites": [
+        "c0c8d47f62c4a8f58fb23f7e3ca703d3"
+    ],
+    "recently_played": [
+        "36b8cec915db1e23d5cf4dc0dc81ba6f",
+        "fc1e1d5791e65717fc12d077f7e526c6",
+        "47c76adc394d83aa765e6af7e2eae154",
+        "fe6d2d927f23c692f4e0a5daa1b0e0b9",
+        "bddd21f80e7b67df61973fb0ece23302",
+        "faa5720d8c7eb0b4f750c3bbf3890ba3",
+        "c0c8d47f62c4a8f58fb23f7e3ca703d3",
+        "d9556f6494f9e3778f227c0bcb35c938",
+        "23200c9b285078dcb4f8e6116afcfdf4"
+    ],
+    "platform_defaults": {},
+    "igdb_client_id": "cn10kwriqehekuxedw1mo09cuadfdo",
+    "igdb_client_secret": "1awnmd8i58y7upfzjk7jbz87ut26kj",
+    "auto_scan_on_startup": false,
+    "minimize_to_tray_on_launch": true,
+    "list_icon_size": 51,
+    "window_geometry": "01d9d0cb00030000000000f7000000cc0000060100000466000000f7000000eb000006010000046600000000000000000a00000000f7000000eb0000060100000466",
+    "window_state": "000000ff00000000fd000000000000050b0000034000000004000000040000000800000008fc00000001000000020000000100000016004d00610069006e0054006f006f006c0042006100720100000000ffffffff0000000000000000",
+    "splitter_state": "000000ff0000000100000002000001180000040601ffffffff010000000100",
+    "sort_order": "Name",
+    "details_panel_visible": true,
+    "selected_platform_filter": "All Platforms",
+    "auto_backup": true,
+    "last_scan_date": "2025-12-10 18:09:14",
+    "total_playtime": 0,
+    "collections": {},
+    "game_tags": {},
+    "hotkeys": {},
+    "performance_mode": "balanced"
+}

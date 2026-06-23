@@ -210,7 +210,9 @@ class GridItemDelegate(QStyledItemDelegate):
             "Super Nintendo": "SNES",
             "Nintendo 64": "N64",
             "PSP": "PSP",
-            "PC": "PC"
+            "PC": "PC",
+            "Xbox 360": "X360",
+            "Xbox": "XBOX"
         }
         platform_name = game_data.get("platform", "ROM")
         short_platform = platform_mapping.get(platform_name, platform_name[:4].upper())
@@ -289,7 +291,9 @@ class SpacedListItemDelegate(QStyledItemDelegate):
             "Super Nintendo": "SNES",
             "Nintendo 64": "N64",
             "PSP": "PSP",
-            "PC": "PC"
+            "PC": "PC",
+            "Xbox 360": "X360",
+            "Xbox": "XBOX"
         }
         platform_text = game_data.get("platform", "N/A")
         short_platform = platform_mapping.get(platform_text, platform_text[:4].upper())

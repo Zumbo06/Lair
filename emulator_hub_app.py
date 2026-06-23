@@ -46,6 +46,8 @@ class EmulatorHubWindow(QMainWindow):
     scan_started = pyqtSignal(str)
     scan_finished = pyqtSignal(str)
     scan_status_update = pyqtSignal(str)
+    # Emitted when scanned games have an uncertain/unresolvable platform
+    platform_warning = pyqtSignal(str)  # comma-separated list of game titles
 
     def __init__(self, config_manager: ConfigManager):
         super().__init__()
@@ -68,6 +70,8 @@ class EmulatorHubWindow(QMainWindow):
         self.scan_started.connect(self._on_scan_started)
         self.scan_finished.connect(self._on_scan_finished)
         self.scan_status_update.connect(self._on_scan_status_update)
+        self.platform_warning.connect(self._on_platform_warning)
+
 
         # Instantiate logical managers
         self.igdb_client = IGDBClient(
@@ -90,9 +94,16 @@ class EmulatorHubWindow(QMainWindow):
         self.load_game_cache()
         
         # Auto scan games on startup if configured
-        if self.config_manager.config.get("auto_scan_on_startup", True):
+        auto_scan = self.config_manager.config.get("auto_scan_on_startup", True)
+        if isinstance(auto_scan, str):
+            auto_scan = auto_scan.lower() == "true"
+            
+        if auto_scan:
+            print("[INFO] Auto scan on startup is enabled. Starting silent PC and ROM scans.")
             QTimer.singleShot(1000, self.trigger_silent_pc_game_autoscan)
             QTimer.singleShot(2500, self._run_quick_rom_scan_startup)
+        else:
+            print("[INFO] Auto scan on startup is disabled. Skipping startup scans.")
             
         self.setup_tray()
 
@@ -350,6 +361,25 @@ class EmulatorHubWindow(QMainWindow):
 
     def _on_scan_status_update(self, msg: str):
         self.statusBar().showMessage(msg)
+
+    def _on_platform_warning(self, titles_str: str):
+        """Called on UI thread when scan finds games with uncertain platform."""
+        titles = [t.strip() for t in titles_str.split(",\n") if t.strip()]
+        n = len(titles)
+        title_list = "\n".join(f"  • {t}" for t in titles[:8])
+        extra = f"\n  …and {n - 8} more" if n > 8 else ""
+        self.statusBar().showMessage(
+            f"⚠ {n} game(s) need platform assignment — right-click → Edit Details.", 9000
+        )
+        QMessageBox.warning(
+            self,
+            "Platform Uncertain",
+            f"Lair could not determine the platform for {n} game(s):\n\n"
+            f"{title_list}{extra}\n\n"
+            "These games were scanned from files with ambiguous extensions "
+            "(e.g. .iso, .chd) and are not inside a platform-named folder.\n\n"
+            "Please right-click each game → ✏ Edit Details → change the Platform dropdown."
+        )
 
     def create_nav_button(self, label, active=False):
         btn = QPushButton(label)
@@ -970,11 +1000,10 @@ class EmulatorHubWindow(QMainWindow):
         has_missing_sizes = False
         for g_hash, game in metadata_map.items():
             # Hydrate game properties
-            # Compute last played timestamp from sessions
             sessions = game.get("sessions", [])
-            last_played_ts = 0
+            last_played_ts = game.get("last_played", 0)
             if sessions:
-                last_played_ts = max(s.get("timestamp", 0) for s in sessions)
+                last_played_ts = max(last_played_ts, max(s.get("timestamp", 0) for s in sessions))
             self.games_data_map[g_hash] = {
                 "title": game.get("title", ""),
                 "path": game.get("path", ""),
@@ -1286,6 +1315,10 @@ class EmulatorHubWindow(QMainWindow):
             ".sat": "Sega Saturn",
             ".gg": "Game Gear",
             ".sms": "Sega Master System",
+            # Xbox 360 (Xenia)
+            ".xex": "Xbox 360",
+            ".gdf": "Xbox 360",
+            ".zar": "Xbox 360",
         }
         
         roms_found = []
@@ -1628,6 +1661,7 @@ class EmulatorHubWindow(QMainWindow):
         platform_icons = {
             "PC": ("💻", None),
             "Xbox": (None, "xbox .png"),
+            "Xbox 360": (None, "xbox .png"),
             "PlayStation 4": (None, "PlayStation_logo.svg.png"),
             "PlayStation 3": (None, "PlayStation_logo.svg.png"),
             "PlayStation 2": (None, "PlayStation_logo.svg.png"),
@@ -1753,6 +1787,8 @@ class EmulatorHubWindow(QMainWindow):
             if old_game:
                 selected_hash = old_game.get("hash")
 
+        scroll_value = self.games_list.verticalScrollBar().value()
+        self.games_list.blockSignals(True)
         self.games_list.clear()
         filter_mode, filter_val = self.get_selected_sidebar_filter()
         
@@ -1809,6 +1845,8 @@ class EmulatorHubWindow(QMainWindow):
             
             self.games_list.addItem(item)
             
+        self.games_list.blockSignals(False)
+
         # Restore selection if the previously selected game is still in the subset
         restored = False
         if selected_hash:
@@ -1829,6 +1867,11 @@ class EmulatorHubWindow(QMainWindow):
         else:
             # Re-trigger selection to ensure banner reflects updated metadata
             self.on_game_selected(self.games_list.currentItem())
+
+        # Force immediate items layout update so the scroll range is recalculated
+        self.games_list.doItemsLayout()
+        # Restore scroll position
+        self.games_list.verticalScrollBar().setValue(scroll_value)
 
     def generate_gradient_fallback(self, title):
         cache_key = f"fallback_{title}"
@@ -1894,6 +1937,14 @@ class EmulatorHubWindow(QMainWindow):
     def fetch_metadata_in_background(self, game_hash, title, platform=None):
         self._pending_enrichments += 1
 
+        # Build reverse map: IGDB platform ID -> canonical platform name
+        # Used to auto-correct platform when IGDB metadata says something different
+        _igdb_id_to_platform = {
+            pid: plat_name
+            for plat_name, ids in IGDBClient.IGDB_PLATFORM_IDS.items()
+            for pid in ids
+        }
+
         def worker():
             enriched = False
             try:
@@ -1906,6 +1957,24 @@ class EmulatorHubWindow(QMainWindow):
                         meta["summary"] = details["summary"]
                         meta["igdb_score"] = details.get("igdb_score")
                         meta["igdb_rating_count"] = details.get("igdb_rating_count", 0)
+
+                        # Auto-correct platform from IGDB data if it differs from stored value
+                        igdb_plat_ids = details.get("igdb_platform_ids", [])
+                        if igdb_plat_ids:
+                            current_platform = meta.get("platform", "")
+                            # Determine what platform IGDB thinks this is
+                            # Prefer the platform that the user already has if IGDB confirms it
+                            current_igdb_ids = IGDBClient.IGDB_PLATFORM_IDS.get(current_platform, [])
+                            platform_confirmed = any(pid in current_igdb_ids for pid in igdb_plat_ids)
+                            if not platform_confirmed and igdb_plat_ids:
+                                # Find best matching canonical platform from IGDB IDs
+                                for pid in igdb_plat_ids:
+                                    if pid in _igdb_id_to_platform:
+                                        new_platform = _igdb_id_to_platform[pid]
+                                        if new_platform != current_platform:
+                                            print(f"[IGDB] Auto-correcting platform for '{title}': {current_platform!r} -> {new_platform!r}")
+                                            meta["platform"] = new_platform
+                                        break
 
                         # Download cover inline (same thread) to avoid spawning another thread
                         if details["cover_image_id"]:
@@ -1948,6 +2017,10 @@ class EmulatorHubWindow(QMainWindow):
             gd["summary"] = meta.get("summary", gd["summary"])
             gd["igdb_score"] = meta.get("igdb_score", gd.get("igdb_score"))
             gd["igdb_rating_count"] = meta.get("igdb_rating_count", gd.get("igdb_rating_count", 0))
+            # Sync platform correction from background enrichment
+            new_platform = meta.get("platform")
+            if new_platform and new_platform != gd.get("platform"):
+                gd["platform"] = new_platform
 
         # Invalidate cover cache so fresh image is shown next repopulate
         self._invalidate_cover_cache(game_hash)
@@ -2195,55 +2268,246 @@ class EmulatorHubWindow(QMainWindow):
 
     def show_edit_game_details_dialog(self, game_data):
         dialog = QDialog(self)
-        dialog.setWindowTitle("Edit Game Metadata")
-        dialog.setMinimumWidth(400)
-        
-        layout = QFormLayout(dialog)
-        
+        dialog.setWindowTitle("Edit Game Details")
+        dialog.setMinimumWidth(520)
+        dialog.setMinimumHeight(480)
+        dialog.setStyleSheet(f"""
+            QDialog {{
+                background-color: {Constants.C_BG_PANEL};
+            }}
+            QLabel {{
+                color: {Constants.C_TEXT_SECONDARY};
+                font-size: 12px;
+                font-weight: 600;
+            }}
+            QLineEdit, QTextEdit, QComboBox {{
+                background-color: {Constants.C_BG_DARK};
+                border: 1.5px solid {Constants.C_BORDER};
+                border-radius: 6px;
+                padding: 6px 10px;
+                color: #ffffff;
+                font-size: 12px;
+            }}
+            QLineEdit:focus, QTextEdit:focus, QComboBox:focus {{
+                border-color: {Constants.C_ACCENT_CYAN};
+            }}
+            QComboBox::drop-down {{ border: none; }}
+            QComboBox QAbstractItemView {{
+                background-color: {Constants.C_BG_PANEL};
+                border: 1.5px solid {Constants.C_BORDER};
+                selection-background-color: {Constants.C_BORDER};
+                color: #ffffff;
+            }}
+        """)
+
+        main_layout = QVBoxLayout(dialog)
+        main_layout.setContentsMargins(24, 20, 24, 20)
+        main_layout.setSpacing(16)
+
+        # Header
+        header = QLabel("✏  EDIT GAME DETAILS")
+        header.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        header.setStyleSheet(f"color: {Constants.C_ACCENT_CYAN}; font-size: 14px; margin-bottom: 4px;")
+        main_layout.addWidget(header)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"color: {Constants.C_BORDER};")
+        main_layout.addWidget(sep)
+
+        form = QFormLayout()
+        form.setSpacing(12)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
         title_edit = QLineEdit(game_data.get("title", ""))
+        title_edit.setMinimumHeight(32)
         dev_edit = QLineEdit(game_data.get("developer", ""))
+        dev_edit.setMinimumHeight(32)
         rel_edit = QLineEdit(game_data.get("release_date", ""))
+        rel_edit.setMinimumHeight(32)
         desc_edit = QTextEdit()
         desc_edit.setPlainText(game_data.get("summary", ""))
-        
-        layout.addRow("Title:", title_edit)
-        layout.addRow("Developer:", dev_edit)
-        layout.addRow("Release Date:", rel_edit)
-        layout.addRow("Description:", desc_edit)
-        
-        btn_cover = QPushButton("Select Custom Poster Art...")
-        layout.addRow("Cover Art:", btn_cover)
-        
+        desc_edit.setMinimumHeight(100)
+        desc_edit.setMaximumHeight(120)
+
+        form.addRow("Title:", title_edit)
+        form.addRow("Developer:", dev_edit)
+        form.addRow("Release Date:", rel_edit)
+        form.addRow("Description:", desc_edit)
+
+        # Platform selector
+        combo_platform = QComboBox()
+        combo_platform.setMinimumHeight(32)
+        all_platforms = [
+            "PC", "PlayStation 4", "PlayStation 3", "PlayStation 2", "PlayStation", "PSP",
+            "Nintendo Switch", "Nintendo 3DS", "Nintendo DS",
+            "GameCube", "Wii", "Wii U",
+            "NES", "Super Nintendo", "Nintendo 64",
+            "Game Boy", "Game Boy Color", "Game Boy Advance",
+            "Xbox", "Xbox 360", "Xbox One",
+            "Sega Dreamcast", "Sega Saturn", "Sega Genesis",
+            "Sega Master System", "Game Gear", "Sega 32X",
+        ]
+        combo_platform.addItems(all_platforms)
+        current_platform = game_data.get("platform", "PC")
+        idx = combo_platform.findText(current_platform)
+        if idx >= 0:
+            combo_platform.setCurrentIndex(idx)
+        else:
+            # If current platform is not in list, add it and select it
+            combo_platform.addItem(current_platform)
+            combo_platform.setCurrentIndex(combo_platform.count() - 1)
+
+        # Platform warning label
+        plat_warning = QLabel("")
+        plat_warning.setWordWrap(True)
+        plat_warning.setStyleSheet(f"color: {Constants.C_WARNING}; font-size: 11px; font-weight: normal;")
+        plat_warning.hide()
+
+        def on_platform_changed(new_platform):
+            """Show info when platform changes so user knows what emulator will be used."""
+            if new_platform in ["PC", "Xbox"]:
+                plat_warning.hide()
+                return
+            emus_for_plat = [
+                name for name, emu in self.config_manager.config.get("emulators", {}).items()
+                if new_platform.lower() in [s.lower() for s in emu.get("systems", [])]
+            ]
+            if emus_for_plat:
+                plat_warning.setText(f"✅ Will launch with: {', '.join(emus_for_plat)}")
+                plat_warning.setStyleSheet(f"color: {Constants.C_SUCCESS}; font-size: 11px; font-weight: normal;")
+            else:
+                plat_warning.setText(f"⚠ No emulator configured for '{new_platform}'. Add one in the EMULATORS tab.")
+                plat_warning.setStyleSheet(f"color: {Constants.C_WARNING}; font-size: 11px; font-weight: normal;")
+            plat_warning.show()
+
+        combo_platform.currentTextChanged.connect(on_platform_changed)
+        # Trigger initial state
+        on_platform_changed(current_platform)
+
+        form.addRow("Platform:", combo_platform)
+        form.addRow("", plat_warning)
+
+        # Cover art picker
+        btn_cover = QPushButton("🖼  Select Custom Poster Art...")
+        btn_cover.setMinimumHeight(32)
+        btn_cover.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cover.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 1.5px solid {Constants.C_BORDER};
+                border-radius: 6px;
+                color: {Constants.C_TEXT_SECONDARY};
+                padding: 6px 14px;
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background-color: {Constants.C_BG_DARK};
+                border-color: {Constants.C_ACCENT_CYAN};
+                color: #ffffff;
+            }}
+        """)
+        form.addRow("Cover Art:", btn_cover)
+
+        main_layout.addLayout(form)
+
         selected_cover = [None]
         def choose_cover():
             path, _ = QFileDialog.getOpenFileName(dialog, "Choose Poster Cover Art", "", "Images (*.jpg *.png *.jpeg *.webp)")
             if path:
-                btn_cover.setText("Poster selected.")
+                btn_cover.setText(f"✅  {Path(path).name}")
+                btn_cover.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: transparent;
+                        border: 1.5px solid {Constants.C_SUCCESS};
+                        border-radius: 6px;
+                        color: {Constants.C_SUCCESS};
+                        padding: 6px 14px;
+                        text-align: left;
+                    }}
+                """)
                 selected_cover[0] = path
         btn_cover.clicked.connect(choose_cover)
-        
-        bbox = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
-        bbox.accepted.connect(dialog.accept)
-        bbox.rejected.connect(dialog.reject)
-        layout.addRow(bbox)
-        
+
+        # Action buttons
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(12)
+        btn_row.addStretch()
+
+        btn_cancel = QPushButton("Cancel")
+        btn_cancel.setMinimumHeight(36)
+        btn_cancel.setMinimumWidth(100)
+        btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cancel.clicked.connect(dialog.reject)
+        btn_row.addWidget(btn_cancel)
+
+        btn_save = QPushButton("💾  SAVE CHANGES")
+        btn_save.setMinimumHeight(36)
+        btn_save.setMinimumWidth(150)
+        btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_save.setStyleSheet(f"""
+            QPushButton {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {Constants.C_ACCENT_VIOLET}, stop:1 #6a3de8);
+                color: #ffffff;
+                border: none;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {Constants.C_VIOLET_HOVER}, stop:1 #7b5af0);
+            }}
+        """)
+        btn_save.clicked.connect(dialog.accept)
+        btn_row.addWidget(btn_save)
+        main_layout.addLayout(btn_row)
+
         if dialog.exec() == QDialog.DialogCode.Accepted:
             g_hash = game_data["hash"]
             meta = self.config_manager.config["game_metadata"].setdefault(g_hash, {})
+            old_platform = meta.get("platform", "PC")
+            new_platform = combo_platform.currentText()
+
             meta["title"] = title_edit.text().strip()
             meta["developer"] = dev_edit.text().strip()
             meta["release_date"] = rel_edit.text().strip()
             meta["summary"] = desc_edit.toPlainText().strip()
-            
+            meta["platform"] = new_platform
+
             if selected_cover[0]:
                 cover_dest = self.config_manager.covers_dir / f"{g_hash}.jpg"
                 try:
                     shutil.copy(selected_cover[0], cover_dest)
                 except Exception as e:
                     print(f"Error copying cover: {e}")
-                    
+
             self.config_manager.save_config()
+
+            # Invalidate cover cache so updated cover shows immediately
+            self._invalidate_cover_cache(g_hash)
+
+            # If platform changed, hot-patch games_data_map
+            if new_platform != old_platform and g_hash in self.games_data_map:
+                self.games_data_map[g_hash]["platform"] = new_platform
+
             self.load_game_cache()
+
+            # Notify user if they changed platform and the emulator is ready
+            if new_platform != old_platform:
+                emus_for_plat = [
+                    name for name, emu in self.config_manager.config.get("emulators", {}).items()
+                    if new_platform.lower() in [s.lower() for s in emu.get("systems", [])]
+                ]
+                if emus_for_plat and new_platform not in ["PC", "Xbox"]:
+                    self.statusBar().showMessage(
+                        f"✅ Platform changed to {new_platform}. Will launch with {emus_for_plat[0]}.", 5000
+                    )
+                elif new_platform not in ["PC", "Xbox"]:
+                    self.statusBar().showMessage(
+                        f"⚠ Platform changed to {new_platform}, but no emulator is configured for it!", 6000
+                    )
 
     # =============================================================================
     # --- ADD CUSTOM GAME DIALOG ---
@@ -2292,12 +2556,14 @@ class EmulatorHubWindow(QMainWindow):
         combo_platform = QComboBox()
         combo_platform.setMinimumHeight(32)
         platforms = [
-            "PlayStation 3", "PlayStation 2", "PlayStation", "PSP",
+            "PlayStation 4", "PlayStation 3", "PlayStation 2", "PlayStation", "PSP",
             "Nintendo Switch", "Nintendo 3DS", "Nintendo DS",
             "GameCube", "Wii", "Wii U",
             "NES", "Super Nintendo", "Nintendo 64",
             "Game Boy", "Game Boy Color", "Game Boy Advance",
-            "PC", "Xbox"
+            "PC", "Xbox", "Xbox 360", "Xbox One",
+            "Sega Dreamcast", "Sega Saturn", "Sega Genesis",
+            "Sega Master System", "Game Gear", "Sega 32X"
         ]
         combo_platform.addItems(platforms)
         form.addRow("Platform:", combo_platform)
@@ -2385,7 +2651,7 @@ class EmulatorHubWindow(QMainWindow):
                 scan_folder_for_exes(os.path.normpath(folder))
                     
         def browse_file():
-            file_filter = "Game Files (*.iso *.bin *.cue *.chd *.cso *.nsp *.xci *.gcz *.rvz *.wbfs *.gba *.gbc *.gb *.nds *.3ds *.nes *.sfc *.z64 *.sfb *.exe *.lnk);;All Files (*)"
+            file_filter = "Game Files (*.iso *.bin *.cue *.chd *.cso *.nsp *.xci *.gcz *.rvz *.wbfs *.gba *.gbc *.gb *.nds *.3ds *.nes *.sfc *.z64 *.sfb *.pkg *.xex *.gdf *.zar *.exe *.lnk);;All Files (*)"
             path, _ = QFileDialog.getOpenFileName(dialog, "Select Game File", "", file_filter)
             if path:
                 edit_path.setText(os.path.normpath(path))
@@ -2405,12 +2671,15 @@ class EmulatorHubWindow(QMainWindow):
                     ".nds": "Nintendo DS", ".3ds": "Nintendo 3DS", ".nes": "NES",
                     ".sfc": "Super Nintendo", ".z64": "Nintendo 64",
                     ".chd": "PlayStation", ".cue": "PlayStation", ".cso": "PSP",
-                    ".sfb": "PlayStation 3", ".exe": "PC"
+                    ".sfb": "PlayStation 3", ".pkg": "PlayStation 4",
+                    ".xex": "Xbox 360", ".gdf": "Xbox 360", ".zar": "Xbox 360",
+                    ".exe": "PC",
                 }
                 if suffix in platform_map:
                     idx = combo_platform.findText(platform_map[suffix])
                     if idx >= 0:
                         combo_platform.setCurrentIndex(idx)
+
                         
         btn_browse_folder.clicked.connect(browse_folder)
         btn_browse_file.clicked.connect(browse_file)
@@ -2618,6 +2887,92 @@ class EmulatorHubWindow(QMainWindow):
                         "and add RPCS3 as a custom emulator with 'PlayStation 3' as the supported system.\n\n"
                         "Lair will then automatically open RPCS3 when you boot this game."
                     )
+
+    # =============================================================================
+    # --- PLATFORM DETECTION FROM PATH ---
+    # =============================================================================
+    # Maps known platform aliases (lowercase) → canonical platform name
+    _PLATFORM_FOLDER_ALIASES = {
+        "pc": "PC",
+        "windows": "PC",
+        "steam": "PC",
+        "xbox": "Xbox",
+        "xbox 360": "Xbox 360",
+        "x360": "Xbox 360",
+        "xenia": "Xbox 360",
+        "xbox one": "Xbox One",
+        "xbox series": "Xbox One",
+        "playstation 4": "PlayStation 4",
+        "ps4": "PlayStation 4",
+        "playstation 3": "PlayStation 3",
+        "ps3": "PlayStation 3",
+        "playstation 2": "PlayStation 2",
+        "ps2": "PlayStation 2",
+        "playstation": "PlayStation",
+        "ps1": "PlayStation",
+        "psx": "PlayStation",
+        "psp": "PSP",
+        "playstation portable": "PSP",
+        "nintendo switch": "Nintendo Switch",
+        "switch": "Nintendo Switch",
+        "nintendo 3ds": "Nintendo 3DS",
+        "3ds": "Nintendo 3DS",
+        "nintendo ds": "Nintendo DS",
+        "nds": "Nintendo DS",
+        "ds": "Nintendo DS",
+        "gamecube": "GameCube",
+        "gc": "GameCube",
+        "wii u": "Wii U",
+        "wiiu": "Wii U",
+        "wii": "Wii",
+        "nes": "NES",
+        "super nintendo": "Super Nintendo",
+        "snes": "Super Nintendo",
+        "nintendo 64": "Nintendo 64",
+        "n64": "Nintendo 64",
+        "game boy advance": "Game Boy Advance",
+        "gba": "Game Boy Advance",
+        "game boy color": "Game Boy Color",
+        "gbc": "Game Boy Color",
+        "game boy": "Game Boy",
+        "gb": "Game Boy",
+        "sega dreamcast": "Sega Dreamcast",
+        "dreamcast": "Sega Dreamcast",
+        "sega saturn": "Sega Saturn",
+        "saturn": "Sega Saturn",
+        "sega genesis": "Sega Genesis",
+        "genesis": "Sega Genesis",
+        "mega drive": "Sega Genesis",
+        "sega mega drive": "Sega Genesis",
+        "sega master system": "Sega Master System",
+        "master system": "Sega Master System",
+        "game gear": "Game Gear",
+        "sega 32x": "Sega 32X",
+        "32x": "Sega 32X",
+    }
+
+    @staticmethod
+    def _detect_platform_from_path(file_path: str) -> str | None:
+        """Try to determine a game's platform from its containing folder names.
+
+        Walks up the directory tree (up to 4 levels) and checks each folder
+        name against the known platform aliases table.  Returns a canonical
+        platform string or None if no match is found.
+        """
+        try:
+            current = Path(file_path)
+            if current.is_file():
+                current = current.parent
+            for _ in range(4):
+                folder_name = current.name.lower().strip()
+                if folder_name in EmulatorHubWindow._PLATFORM_FOLDER_ALIASES:
+                    return EmulatorHubWindow._PLATFORM_FOLDER_ALIASES[folder_name]
+                current = current.parent
+                if current == current.parent:  # Filesystem root
+                    break
+        except Exception:
+            pass
+        return None
 
     # =============================================================================
     # --- AUTO-DISCOVER RPCS3 FOR PS3 GAMES ---
@@ -2883,6 +3238,19 @@ class EmulatorHubWindow(QMainWindow):
                 # It's a direct file (e.g. .elf or .bin)
                 if "-g" not in cmd:
                     cmd.insert(-1, "-g")
+
+        elif "xenia" in norm_emu.lower():
+            # Xenia: if the user pointed to a folder, look for default.xex inside it
+            if os.path.isdir(norm_game):
+                candidates = ["default.xex", "default.xbla", "game.xex"]
+                for cand in candidates:
+                    check = os.path.join(norm_game, cand)
+                    if os.path.exists(check):
+                        if cmd[-1] == norm_game:
+                            cmd[-1] = check
+                        break
+            # Xenia takes the game file as the only positional argument
+            # Make sure we don't double-add the path
             
         try:
             emu_dir = os.path.dirname(norm_emu)
@@ -2891,6 +3259,7 @@ class EmulatorHubWindow(QMainWindow):
             self._on_game_launched(game_hash)
         except Exception as e:
             QMessageBox.critical(self, "Launch Emulator Failed", f"Could not start emulator process:\n{e}")
+
 
     def mark_game_recently_played(self, game_hash):
         recents = self.config_manager.config.setdefault("recently_played", [])
@@ -3022,6 +3391,8 @@ class EmulatorHubWindow(QMainWindow):
                 # Sega
                 ".32x": "Sega 32X", ".cdi": "Sega Dreamcast", ".gdi": "Sega Dreamcast",
                 ".sat": "Sega Saturn", ".gg": "Game Gear", ".sms": "Sega Master System",
+                # Xbox 360 (Xenia)
+                ".xex": "Xbox 360", ".gdf": "Xbox 360", ".zar": "Xbox 360",
             }
 
             for path in self.config_manager.config["game_library_paths"]:
@@ -3085,6 +3456,9 @@ class EmulatorHubWindow(QMainWindow):
                         dirs.remove(sce_sys_dir)
 
                     # File suffix scanning
+                    # Ambiguous extensions that map to multiple possible platforms —
+                    # folder name detection will override these defaults.
+                    AMBIGUOUS_EXTENSIONS = {".iso", ".chd", ".cue", ".bin"}
                     for f in files:
                         file_path = Path(root) / f
                         suffix = file_path.suffix.lower()
@@ -3095,15 +3469,29 @@ class EmulatorHubWindow(QMainWindow):
                             target_path = str(file_path)
                             g_hash = hashlib.md5(target_path.encode('utf-8')).hexdigest()
                             if g_hash not in self.config_manager.config["game_metadata"]:
+                                # Try to refine platform using parent folder names
+                                folder_platform = self._detect_platform_from_path(target_path)
+                                platform_uncertain = False
+
+                                if folder_platform:
+                                    # A parent folder explicitly names the platform — use it
+                                    platform = folder_platform
+                                elif suffix in AMBIGUOUS_EXTENSIONS:
+                                    # Extension is ambiguous and no folder context found —
+                                    # keep default but mark as uncertain for IGDB resolution
+                                    platform_uncertain = True
+
                                 entry = {
                                     "title": file_path.stem, "path": target_path,
                                     "platform": platform, "playtime": 0, "sessions": [],
                                     "developer": "Unknown Developer", "release_date": "N/A",
                                     "summary": f"Local ROM for {platform}", "cover_image_id": "",
-                                    "size": file_path.stat().st_size
+                                    "size": file_path.stat().st_size,
+                                    "platform_uncertain": platform_uncertain,
                                 }
                                 self.config_manager.config["game_metadata"][g_hash] = entry
                                 new_games.append((g_hash, entry))
+
 
             # ----------------------------------------------------------------
             # 3. Scan RPCS3 dev_hdd0/game folders (fixes PS3 new-game detection)
@@ -3214,27 +3602,48 @@ class EmulatorHubWindow(QMainWindow):
             # ----------------------------------------------------------------
             if self.igdb_client.is_configured():
                 import concurrent.futures
+                import re as _re
+
+                # Region / release-edition labels to strip before IGDB search
+                _REGION_LABEL_PATTERN = _re.compile(
+                    r'\s*[\(\[](Europe|USA|Japan|PAL|NTSC|World|En|Fr|De|Es|It|Nl|Pt|'
+                    r'Rev\s?\d*|v\d[\d\.]*|Beta|Demo|Proto|Sample|Promo|'
+                    r'Disc\s?\d+|CD\s?\d+|En,Fr,De|[A-Z]{2,3}(?:,[A-Z]{2,3})*)'
+                    r'[\)\]]\s*',
+                    _re.IGNORECASE
+                )
+
+                def _strip_region_labels(title: str) -> str:
+                    return _REGION_LABEL_PATTERN.sub(' ', title).strip()
 
                 def _fetch_new_game_meta(item):
                     ghash, entry = item
+                    raw_title = entry["title"]
+                    clean_title = _strip_region_labels(raw_title)
                     details = self.igdb_client.fetch_game_details(
-                        entry["title"], platform=entry.get("platform")
+                        clean_title, platform=entry.get("platform") if not entry.get("platform_uncertain") else None
                     )
-                    return ghash, entry, details
+                    return ghash, entry, details, clean_title
+
+                # Track uncertain-platform games that IGDB also failed to resolve
+                uncertain_unresolved = []
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                     futures = {executor.submit(_fetch_new_game_meta, item): item for item in new_games}
                     for future in concurrent.futures.as_completed(futures):
                         try:
-                            ghash, entry, details = future.result()
+                            ghash, entry, details, clean_title = future.result()
                         except Exception:
-                            continue
-
-                        if not details:
                             continue
 
                         meta_ref = self.config_manager.config["game_metadata"].get(ghash)
                         if not meta_ref:
+                            continue
+
+                        if not details:
+                            # If platform was uncertain and IGDB found nothing, flag for warning
+                            if entry.get("platform_uncertain"):
+                                uncertain_unresolved.append(meta_ref.get("title", entry.get("title", "?")))
                             continue
 
                         meta_ref["developer"] = details["developer"]
@@ -3242,6 +3651,8 @@ class EmulatorHubWindow(QMainWindow):
                         meta_ref["summary"] = details["summary"]
                         meta_ref["igdb_score"] = details.get("igdb_score")
                         meta_ref["igdb_rating_count"] = details.get("igdb_rating_count", 0)
+                        # Clear uncertainty flag once IGDB resolved it
+                        meta_ref.pop("platform_uncertain", None)
 
                         cover_id = details.get("cover_image_id", "")
                         if cover_id:
@@ -3257,6 +3668,13 @@ class EmulatorHubWindow(QMainWindow):
 
                 self.igdb_client.flush_cache()
                 self.config_manager.save_config()
+
+                # Warn user on the UI thread about games with unresolvable platform
+                if uncertain_unresolved:
+                    titles_str = ",\n".join(uncertain_unresolved[:8])
+                    if len(uncertain_unresolved) > 8:
+                        titles_str += f",\n…+{len(uncertain_unresolved) - 8} more"
+                    self.platform_warning.emit(titles_str)
 
         except Exception as e:
             print(f"Error in quick scan: {e}")
@@ -3363,6 +3781,13 @@ class EmulatorHubWindow(QMainWindow):
                 "systems": ["Nintendo Switch"],
                 "args": "%ROM%",
                 "subdirs": ["yuzu", "yuzu-windows-msvc"]
+            },
+            {
+                "name": "Xenia",
+                "exes": ["xenia.exe", "xenia_canary.exe", "xenia_canary_experimental.exe"],
+                "systems": ["Xbox 360"],
+                "args": "%ROM%",
+                "subdirs": ["Xenia", "xenia", "xenia-canary", "xenia_canary"]
             },
             {
                 "name": "Cemu",
@@ -3521,13 +3946,42 @@ class EmulatorHubWindow(QMainWindow):
         edit_systems.setMinimumHeight(30)
         edit_systems.setPlaceholderText("e.g. PlayStation 3, PlayStation 2, GameCube, Wii")
         
+        combo_select_platform = QComboBox()
+        combo_select_platform.setMinimumHeight(30)
+        platforms_list = [
+            "PC", "PlayStation 4", "PlayStation 3", "PlayStation 2", "PlayStation", "PSP",
+            "Nintendo Switch", "Nintendo 3DS", "Nintendo DS", "GameCube", "Wii", "Wii U",
+            "NES", "Super Nintendo", "Nintendo 64", "Game Boy", "Game Boy Color", "Game Boy Advance",
+            "Sega Dreamcast", "Sega Genesis", "Sega Mega Drive", "Xbox 360", "Xbox"
+        ]
+        combo_select_platform.addItems(["-- Select Platform to Add --"] + platforms_list)
+        
+        def on_platform_selected(text):
+            if text and text != "-- Select Platform to Add --":
+                current_text = edit_systems.text().strip()
+                if current_text:
+                    parts = [p.strip() for p in current_text.split(",") if p.strip()]
+                    if text not in parts:
+                        parts.append(text)
+                        edit_systems.setText(", ".join(parts))
+                else:
+                    edit_systems.setText(text)
+                combo_select_platform.setCurrentIndex(0)
+                
+        combo_select_platform.currentTextChanged.connect(on_platform_selected)
+        
+        systems_lay = QVBoxLayout()
+        systems_lay.setSpacing(6)
+        systems_lay.addWidget(combo_select_platform)
+        systems_lay.addWidget(edit_systems)
+        
         edit_args = QLineEdit("%ROM%")
         edit_args.setMinimumHeight(30)
         edit_args.setPlaceholderText("Default launch arguments. Use %ROM% for game file target")
         
         layout.addRow("Emulator Name:", edit_name)
         layout.addRow("Executable Path:", exe_lay)
-        layout.addRow("Supported Systems:", edit_systems)
+        layout.addRow("Supported Systems:", systems_lay)
         layout.addRow("Launch Args:", edit_args)
         
         bbox = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
@@ -3641,13 +4095,42 @@ class EmulatorHubWindow(QMainWindow):
         edit_systems.setMinimumHeight(30)
         edit_systems.setPlaceholderText("e.g. PlayStation 3, PlayStation 2, GameCube, Wii")
         
+        combo_select_platform = QComboBox()
+        combo_select_platform.setMinimumHeight(30)
+        platforms_list = [
+            "PC", "PlayStation 4", "PlayStation 3", "PlayStation 2", "PlayStation", "PSP",
+            "Nintendo Switch", "Nintendo 3DS", "Nintendo DS", "GameCube", "Wii", "Wii U",
+            "NES", "Super Nintendo", "Nintendo 64", "Game Boy", "Game Boy Color", "Game Boy Advance",
+            "Sega Dreamcast", "Sega Genesis", "Sega Mega Drive", "Xbox 360", "Xbox"
+        ]
+        combo_select_platform.addItems(["-- Select Platform to Add --"] + platforms_list)
+        
+        def on_platform_selected(text):
+            if text and text != "-- Select Platform to Add --":
+                current_text = edit_systems.text().strip()
+                if current_text:
+                    parts = [p.strip() for p in current_text.split(",") if p.strip()]
+                    if text not in parts:
+                        parts.append(text)
+                        edit_systems.setText(", ".join(parts))
+                else:
+                    edit_systems.setText(text)
+                combo_select_platform.setCurrentIndex(0)
+                
+        combo_select_platform.currentTextChanged.connect(on_platform_selected)
+        
+        systems_lay = QVBoxLayout()
+        systems_lay.setSpacing(6)
+        systems_lay.addWidget(combo_select_platform)
+        systems_lay.addWidget(edit_systems)
+        
         edit_args = QLineEdit(emu_data.get("args", "%ROM%"))
         edit_args.setMinimumHeight(30)
         edit_args.setPlaceholderText("Default launch arguments. Use %ROM% for game file target")
         
         layout.addRow("Emulator Name:", edit_name)
         layout.addRow("Executable Path:", exe_lay)
-        layout.addRow("Supported Systems:", edit_systems)
+        layout.addRow("Supported Systems:", systems_lay)
         layout.addRow("Launch Args:", edit_args)
         
         bbox = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
@@ -3833,4 +4316,5 @@ if __name__ == "__main__":
     config_obj = ConfigManager()
     window = EmulatorHubWindow(config_obj)
     window.show()
+    sys.exit(app.exec())
     sys.exit(app.exec())

@@ -31,6 +31,19 @@ class PlaytimeTracker(QObject):
         pids = []
         if isinstance(launch_result, subprocess.Popen):
             pids.append(launch_result.pid)
+            
+            # Start background thread to wait for process exit and trigger instant check
+            import threading
+            def wait_for_exit(proc_obj):
+                try:
+                    proc_obj.wait()
+                except:
+                    pass
+                from PyQt6.QtCore import QMetaObject
+                QMetaObject.invokeMethod(self, "handle_process_exit", Qt.ConnectionType.QueuedConnection)
+                
+            threading.Thread(target=wait_for_exit, args=(launch_result,), daemon=True).start()
+            
         elif isinstance(launch_result, int) and launch_result > 0:
             pids.append(launch_result)
             
@@ -54,6 +67,10 @@ class PlaytimeTracker(QObject):
             'grace_periods': -6  # Give 30s initial startup grace period (6 intervals * 5s) for games/launchers to boot
         }
         print(f"Started playtime tracking for game {game_hash} (PIDs: {pids}, Exe: {exe_target})")
+
+    def handle_process_exit(self):
+        print("Process exit detected. Triggering instant active processes check.")
+        self.check_active_processes()
 
     def check_active_processes(self):
         if not psutil or not self.active_sessions:
@@ -113,10 +130,14 @@ class PlaytimeTracker(QObject):
                 # Reset grace period if process found
                 session['grace_periods'] = 0
             else:
-                # Apply 15-second grace period (3 intervals * 5s) to prevent early closure when launchers restart games
-                session['grace_periods'] += 1
-                if session['grace_periods'] >= 3:
+                # If we've already started (grace_periods >= 0) and nothing is running, exit immediately!
+                if session['grace_periods'] >= 0:
                     finished_games.append(game_hash)
+                else:
+                    # Apply 15-second grace period (3 intervals * 5s) during startup if it hasn't started yet
+                    session['grace_periods'] += 1
+                    if session['grace_periods'] >= 3:
+                        finished_games.append(game_hash)
 
         # Finalize finished tracking sessions
         for game_hash in finished_games:
@@ -132,9 +153,14 @@ class PlaytimeTracker(QObject):
         # Deduct grace period time (15s) from recorded duration
         duration = max(0, duration - (session['grace_periods'] * 5))
         
+        # Ensure metadata entry exists
+        metadata = self.config_manager.config["game_metadata"].setdefault(game_hash, {})
+        
+        # Always update last played timestamp
+        metadata["last_played"] = time.time()
+        
         if duration > 10:  # Only save sessions longer than 10 seconds to avoid noise
             # Update sessions database in config
-            metadata = self.config_manager.config["game_metadata"].setdefault(game_hash, {})
             sessions = metadata.setdefault("sessions", [])
             sessions.append({
                 "timestamp": time.time(),
@@ -144,9 +170,10 @@ class PlaytimeTracker(QObject):
             # Recalculate total playtime
             total_playtime = sum(s.get("duration", 0) for s in sessions)
             metadata["playtime"] = total_playtime
-            
-            self.config_manager.save_config()
-            self.playtime_updated.emit(game_hash, total_playtime)
             print(f"Finished tracking for game {game_hash}. Added session: {int(duration)} seconds. Total playtime: {total_playtime / 3600:.2f} hrs.")
         else:
             print(f"Tracking session discarded for game {game_hash} (duration too short: {int(duration)}s)")
+            
+        total_playtime = metadata.get("playtime", 0)
+        self.config_manager.save_config()
+        self.playtime_updated.emit(game_hash, total_playtime)

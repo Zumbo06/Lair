@@ -108,7 +108,15 @@ class IGDBClient:
         "Game Boy Advance": [24],     # GBA
         "Game Boy Color": [22],       # GBC
         "Game Boy": [33],             # GB
-        "Xbox": [11, 12, 49, 169],    # Xbox, Xbox 360, Xbox One, Xbox Series
+        "Xbox": [11],                 # Original Xbox
+        "Xbox 360": [12],             # Xbox 360
+        "Xbox One": [49],             # Xbox One
+        "Sega Dreamcast": [23],       # Dreamcast
+        "Sega Saturn": [32],          # Saturn
+        "Sega Genesis": [29],         # Mega Drive / Genesis
+        "Sega Master System": [64],   # Master System
+        "Game Gear": [35],            # Game Gear
+        "Sega 32X": [30],             # 32X
     }
 
     @staticmethod
@@ -133,6 +141,14 @@ class IGDBClient:
         # Remove trailing disc/version numbers like "- Disc 1" or "v1.02"
         clean_title = re.sub(r'\s*[-–]\s*Disc\s*\d+', '', clean_title, flags=re.IGNORECASE).strip()
         clean_title = re.sub(r'\s+v\d+\.\d+.*$', '', clean_title).strip()
+        # Strip region / edition labels: (Europe), (USA), (Japan), (PAL), (Rev 1), etc.
+        clean_title = re.sub(
+            r'\s*[\(\[](Europe|USA|Japan|PAL|NTSC|World|En|Fr|De|Es|It|Nl|Pt|'
+            r'Rev\s?\d*|v\d[\d\.]*|Beta|Demo|Proto|Sample|Promo|'
+            r'Disc\s?\d+|CD\s?\d+|En,Fr,De|[A-Z]{2,3}(?:,[A-Z]{2,3})*)[\)\]]\s*',
+            ' ', clean_title, flags=re.IGNORECASE
+        ).strip()
+
         
         # 2. Only perform expensive serial lookups if the title is just a serial code
         is_probably_serial_only = bool(re.fullmatch(r'[A-Za-z]{3,4}[-_]?\d{4,5}', clean_title.replace(' ', '')))
@@ -173,22 +189,26 @@ class IGDBClient:
             plat_lower = platform.lower().strip()
             for key, val in self.IGDB_PLATFORM_IDS.items():
                 key_l = key.lower().strip()
-                if (key_l == plat_lower or 
-                    (plat_lower in ["ps3", "playstation 3"] and "playstation 3" in key_l) or 
-                    (plat_lower in ["ps2", "playstation 2"] and "playstation 2" in key_l) or 
-                    (plat_lower in ["ps1", "psx", "playstation 1", "playstation"] and key_l == "playstation") or 
-                    (plat_lower in ["psp", "playstation portable"] and key_l == "psp") or 
-                    (plat_lower in ["snes", "super nintendo"] and "super nintendo" in key_l) or 
+                if (key_l == plat_lower or
+                    (plat_lower in ["ps3", "playstation 3"] and key_l == "playstation 3") or
+                    (plat_lower in ["ps2", "playstation 2"] and key_l == "playstation 2") or
+                    (plat_lower in ["ps1", "psx", "playstation 1", "playstation"] and key_l == "playstation") or
+                    (plat_lower in ["psp", "playstation portable"] and key_l == "psp") or
+                    (plat_lower in ["snes", "super nintendo"] and key_l == "super nintendo") or
                     (plat_lower in ["nes", "nintendo entertainment system"] and key_l == "nes") or
-                    (plat_lower in ["switch", "nintendo switch"] and "switch" in key_l) or
-                    (plat_lower in ["gc", "gamecube", "nintendo gamecube"] and "gamecube" in key_l) or
+                    (plat_lower in ["switch", "nintendo switch"] and key_l == "nintendo switch") or
+                    (plat_lower in ["gc", "gamecube", "nintendo gamecube"] and key_l == "gamecube") or
                     (plat_lower in ["wii", "nintendo wii"] and key_l == "wii") or
-                    (plat_lower in ["gba", "game boy advance"] and "game boy advance" in key_l) or
-                    (plat_lower in ["gbc", "game boy color"] and "game boy color" in key_l) or
+                    (plat_lower in ["wiiu", "wii u"] and key_l == "wii u") or
+                    (plat_lower in ["gba", "game boy advance"] and key_l == "game boy advance") or
+                    (plat_lower in ["gbc", "game boy color"] and key_l == "game boy color") or
                     (plat_lower in ["gb", "game boy"] and key_l == "game boy") or
                     (plat_lower in ["ds", "nds", "nintendo ds"] and key_l == "nintendo ds") or
                     (plat_lower in ["3ds", "nintendo 3ds"] and key_l == "nintendo 3ds") or
-                    (plat_lower in ["n64", "nintendo 64"] and "nintendo 64" in key_l)):
+                    (plat_lower in ["n64", "nintendo 64"] and key_l == "nintendo 64") or
+                    (plat_lower in ["xbox360", "xbox 360", "x360"] and key_l == "xbox 360") or
+                    (plat_lower in ["xbone", "xbox one"] and key_l == "xbox one") or
+                    (plat_lower in ["xbox"] and key_l == "xbox")):
                     target_platform_ids = val
                     break
 
@@ -327,8 +347,11 @@ class IGDBClient:
                         break
                 
                 if not selected_game:
-                    print(f"[IGDB Auto Fetch] No game matched the target platform '{platform}' IDs {target_platform_ids}.")
-                    return None
+                    # No platform-exact match — fall back to the best title-scored result
+                    # so the game still gets metadata (developer, summary, cover, score).
+                    # The igdb_platform_ids field will let the caller auto-correct platform.
+                    print(f"[IGDB] No platform-exact match for '{clean_title}' on {platform} — using best title match.")
+                    selected_game = results[0]
             else:
                 selected_game = results[0]
             
@@ -368,6 +391,14 @@ class IGDBClient:
                 cover_id = cover_data.get("image_id", "")
             
             igdb_score = self._extract_igdb_score(game_data)
+
+            # Collect raw IGDB platform IDs so callers can auto-correct platform
+            raw_game_plat_ids = []
+            for gp in game_data.get("platforms", []):
+                if isinstance(gp, int):
+                    raw_game_plat_ids.append(gp)
+                elif isinstance(gp, dict) and "id" in gp:
+                    raw_game_plat_ids.append(gp["id"])
             
             details = {
                 "name": game_data.get("name", clean_title),
@@ -381,7 +412,8 @@ class IGDBClient:
                 "igdb_aggregated_rating": game_data.get("aggregated_rating"),
                 "igdb_aggregated_rating_count": game_data.get("aggregated_rating_count", 0),
                 "igdb_total_rating": game_data.get("total_rating"),
-                "igdb_total_rating_count": game_data.get("total_rating_count", 0)
+                "igdb_total_rating_count": game_data.get("total_rating_count", 0),
+                "igdb_platform_ids": raw_game_plat_ids,   # Raw IDs for platform correction
             }
             
             # Store in cache (batch-save later, not per-game)
