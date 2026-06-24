@@ -44,7 +44,11 @@ class ConfigManager:
             "igdb_client_id": "",
             "igdb_client_secret": "",
             "auto_scan_on_startup": True,
-            "minimize_to_tray_on_launch": False
+            "minimize_to_tray_on_launch": False,
+            "mute_sound_effects": False,
+            "sound_effects_volume": 70,
+            "sidebar_sound_effects_volume": 70,
+            "high_contrast": False
         }
         self.igdb_cache = {}
         self.load_config()

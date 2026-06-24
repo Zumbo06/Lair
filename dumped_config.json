@@ -107,8 +107,13 @@
             "title": "Nightshade",
             "path": "E:\\Oyunlar\\Playstation 2\\Nightshade (USA).iso",
             "platform": "PlayStation 2",
-            "playtime": 0,
-            "sessions": [],
+            "playtime": 16.101561546325684,
+            "sessions": [
+                {
+                    "timestamp": 1782230380.6640427,
+                    "duration": 16.101561546325684
+                }
+            ],
             "developer": "Sega WOW",
             "release_date": "2003-12-04",
             "summary": "A new rift opens between Earth and the evil realm. Unwilling to succumb to the demonic forces threatening Tokyo, the people enlist the talents of Hibana. With her sword in hand, she alone must battle the legion of Hellspawn and return peace to Earth.\n\nUnleash chain attacks to destroy countless enemies.\nCrush evil with powerful Ninja Magic.\nExecute devastating mid-air assaults and defense maneuvers.\nFight atop fighter jets, moving trucks, and more.\n\nNightshade is the direct sequel to the 2002 Shinobi revival and follows the exploits of a kunoichi, a female shinobi, named Hibana.",
@@ -116,7 +121,8 @@
             "size": 3844898816,
             "auto_fetch_disabled": false,
             "igdb_score": 60.7,
-            "igdb_rating_count": 0
+            "igdb_rating_count": 0,
+            "last_played": 1782230380.6640418
         },
         "457ff011cf2833b8d0b31fc76b6fddd4": {
             "title": "Turok - Evolution (USA)",
@@ -293,20 +299,6 @@
             "cover_image_id": "co2wvy",
             "size": 9540354938
         },
-        "0bc127fed6bf7b2d30eb2b9bbe4ac5c7": {
-            "title": "ShadPs4Plus-PkgExtractor-1.1-windows",
-            "path": "D:\\DriveCluv\\ShadPs4Plus-PkgExtractor-1.1-windows\\pkg_extractor.exe",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "D:\\DriveCluv\\ShadPs4Plus-PkgExtractor-1.1-windows\\pkg_extractor.exe",
-            "game_dir": "D:\\DriveCluv\\ShadPs4Plus-PkgExtractor-1.1-windows",
-            "size": 2959913
-        },
         "b4d753fa9e74c1c5ba17ba3692b750b5": {
             "title": "Saints Row: The Third Remastered",
             "path": "D:\\games\\SaintsRowTheThird\\SRTTR.exe",
@@ -324,20 +316,6 @@
             "size": 49781119364,
             "auto_fetch_disabled": false
         },
-        "51a0f01f36b9e58a82e11cca72fadc87": {
-            "title": "SaintsRowTheThird",
-            "path": "D:\\Games\\SaintsRowTheThird\\SRTTR.exe",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "D:\\Games\\SaintsRowTheThird\\SRTTR.exe",
-            "game_dir": "D:\\Games\\SaintsRowTheThird",
-            "size": 49781119364
-        },
         "aeac7133a269a50d8d0519fcab0ee0d5": {
             "title": "God Hand",
             "path": "E:\\Oyunlar\\Playstation 2\\God Hand (USA)\\God Hand (USA).iso",
@@ -353,64 +331,21 @@
             "igdb_score": 73.0,
             "igdb_rating_count": 75
         },
-        "b8e4e536a320b68e83e6c179a53aa893": {
-            "title": "TEST12345",
-            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\rpcs3-v0.0.37-18022-9c93ec0b_win64_msvc\\dev_hdd0\\game\\TEST12345",
-            "platform": "PlayStation 3",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local ROM for PlayStation 3",
-            "cover_image_id": "",
-            "size": 0
-        },
-        "51d92da7dbae9be6dfe8afe4aded46b7": {
-            "title": "＄locks",
-            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\rpcs3-v0.0.37-18022-9c93ec0b_win64_msvc\\dev_hdd0\\game\\＄locks",
-            "platform": "PlayStation 3",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local ROM for PlayStation 3",
-            "cover_image_id": "",
-            "size": 0
-        },
-        "95f5953212f29c8ab475d78ace15a143": {
-            "title": "shortcuts",
-            "path": "C:\\Users\\yhgoz\\Desktop\\Programlar\\rpcs3-v0.0.37-18022-9c93ec0b_win64_msvc\\games\\shortcuts",
-            "platform": "PlayStation 3",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Race against opponents, and stack up all the floorboards you can pick up along the way!\nIf you're clever enough, get out of the way and build bridges and take shortcuts to get to the finish line before everyone else!",
-            "cover_image_id": "",
-            "size": 4714,
-            "igdb_score": null,
-            "igdb_rating_count": 0
-        },
-        "fdb175cb0e6251665d3f138f2987bbb6": {
-            "title": "Marvel's.Spider-Man.2.Digital.Deluxe.Edition-InsaneRamZes",
-            "path": "D:\\games\\Marvel's.Spider-Man.2.Digital.Deluxe.Edition-InsaneRamZes\\Spider-Man2.exe",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "D:\\games\\Marvel's.Spider-Man.2.Digital.Deluxe.Edition-InsaneRamZes\\Spider-Man2.exe",
-            "game_dir": "D:\\games\\Marvel's.Spider-Man.2.Digital.Deluxe.Edition-InsaneRamZes",
-            "size": 148089240288
-        },
         "36b8cec915db1e23d5cf4dc0dc81ba6f": {
             "title": "Gears of War 2",
             "path": "C:\\Users\\yhgoz\\Downloads\\Gears of War 2 (Europe) (En,Fr,De,Es,It,Zh,Ko,Pl,Ru,Cs,Hu) (En,Es,It)\\Gears of War 2 (Europe) (En,Fr,De,Es,It,Zh,Ko,Pl,Ru,Cs,Hu) (En,Es,It).iso",
             "platform": "Xbox 360",
-            "playtime": 0,
-            "sessions": [],
+            "playtime": 15110.20400929451,
+            "sessions": [
+                {
+                    "timestamp": 1782245639.6832078,
+                    "duration": 11762.840230464935
+                },
+                {
+                    "timestamp": 1782249148.4593718,
+                    "duration": 3347.3637788295746
+                }
+            ],
             "developer": "Epic Games",
             "release_date": "2008-11-07",
             "summary": "In Gears of War 2, The COG continues its fight against the Locust horde, who are attempting to sink all of the cities on the planet Sera by using a big riftworm to eat the ground beneath them. Sergeant Marcus Fenix leads Delta Squad into the depths of the planet to try to stop the worm from eating but instead they discover the true intent of the Locust actions.",
@@ -418,7 +353,8 @@
             "igdb_score": 90.4,
             "igdb_rating_count": 440,
             "size": 7835492352,
-            "auto_fetch_disabled": false
+            "auto_fetch_disabled": false,
+            "last_played": 1782249148.4593706
         },
         "88ed70007ad2ed2701dcd1e6cfc1234c": {
             "title": "Outlast 2",
@@ -437,131 +373,21 @@
             "igdb_rating_count": 237,
             "auto_fetch_disabled": false
         },
-        "c4bed5bc019c2f1c823e21a8f2884ade": {
-            "title": "juneberryPublic",
-            "path": "D:\\Games\\juneberryPublic\\Prerequisites\\directx_Jun2010_redist.exe",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "D:\\Games\\juneberryPublic\\Prerequisites\\directx_Jun2010_redist.exe",
-            "game_dir": "D:\\Games\\juneberryPublic",
-            "size": 27272594799
-        },
-        "9409da11177f594b2ff669b3dacdeea0": {
-            "title": "juneberryPublic",
-            "path": "D:\\games\\juneberryPublic\\Prerequisites\\directx_Jun2010_redist.exe",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "D:\\games\\juneberryPublic\\Prerequisites\\directx_Jun2010_redist.exe",
-            "game_dir": "D:\\games\\juneberryPublic",
-            "size": 27272594799
-        },
-        "57ec978762699b1ba9ac3b6b80102050": {
-            "title": "1964_GEPD_Edition",
-            "path": "C:\\Users\\yhgoz\\Downloads\\1964_GEPD_Edition\\1964\\1964.exe",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "C:\\Users\\yhgoz\\Downloads\\1964_GEPD_Edition\\1964\\1964.exe",
-            "game_dir": "C:\\Users\\yhgoz\\Downloads\\1964_GEPD_Edition",
-            "size": 77728778
-        },
-        "eb4166d655ac67c95dcce4ed5db3314b": {
-            "title": "DLSS.Swapper-1.2.4.0-portable",
-            "path": "C:\\Users\\yhgoz\\Downloads\\DLSS.Swapper-1.2.4.0-portable\\DLSS Swapper.exe",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "C:\\Users\\yhgoz\\Downloads\\DLSS.Swapper-1.2.4.0-portable\\DLSS Swapper.exe",
-            "game_dir": "C:\\Users\\yhgoz\\Downloads\\DLSS.Swapper-1.2.4.0-portable",
-            "size": 394705695
-        },
-        "468d3df6fd3d2aad8ebb46f08d115cf3": {
-            "title": "nvidiaProfileInspector",
-            "path": "C:\\Users\\yhgoz\\Downloads\\nvidiaProfileInspector\\nvidiaProfileInspector.exe",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "C:\\Users\\yhgoz\\Downloads\\nvidiaProfileInspector\\nvidiaProfileInspector.exe",
-            "game_dir": "C:\\Users\\yhgoz\\Downloads\\nvidiaProfileInspector",
-            "size": 1240221
-        },
-        "df8c7c731e25f112e3becc0c754193c1": {
-            "title": "Steamworks Common Redistributables",
-            "path": "steam://rungameid/228980",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "c:\\program files (x86)\\steam\\steamapps\\common\\Steamworks Shared\\_CommonRedist\\DotNet\\4.8\\ndp48-x86-x64-allos-enu.exe",
-            "game_dir": "c:\\program files (x86)\\steam\\steamapps\\common\\Steamworks Shared",
-            "size": 480820079
-        },
-        "f9e4d0e363794d12db5a50df88ce957b": {
-            "title": "Wallpaper Engine",
-            "path": "steam://rungameid/431960",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "c:\\program files (x86)\\steam\\steamapps\\common\\wallpaper_engine\\wallpaper64.exe",
-            "game_dir": "c:\\program files (x86)\\steam\\steamapps\\common\\wallpaper_engine",
-            "size": 2488224986
-        },
-        "d9556f6494f9e3778f227c0bcb35c938": {
-            "title": "Lossless Scaling",
-            "path": "steam://rungameid/993090",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "c:\\program files (x86)\\steam\\steamapps\\common\\Lossless Scaling\\LosslessScaling.exe",
-            "game_dir": "c:\\program files (x86)\\steam\\steamapps\\common\\Lossless Scaling",
-            "size": 183809856
-        },
         "bddd21f80e7b67df61973fb0ece23302": {
             "title": "Batman™: Arkham Knight",
             "path": "steam://rungameid/208650",
             "platform": "PC",
             "playtime": 0,
             "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
+            "developer": "Rocksteady Studios",
+            "release_date": "2015-06-23",
+            "summary": "Batman: Arkham Knight is an action-adventure game developed by Rocksteady Studios, released in 2015. It is the final installment in the Arkham series. Players control Batman as he faces Scarecrow, who unites Gotham's criminals to destroy the Dark Knight. The mysterious Arkham Knight, a new adversary, aids Scarecrow in his plan.\n\nThe game features open-world exploration, stealth, combat, and puzzle-solving. A key addition is the Batmobile, used for traversal and combat. The story explores Batman’s psychological struggles and the collapse of his alliances as Gotham spirals into chaos.",
+            "cover_image_id": "coagib",
             "tracking_exe": "D:\\SteamLibrary\\steamapps\\common\\Batman Arkham Knight\\Binaries\\Win64\\BatmanAK.exe",
             "game_dir": "D:\\SteamLibrary\\steamapps\\common\\Batman Arkham Knight",
-            "size": 57926273889
+            "size": 57926273889,
+            "igdb_score": 91.8,
+            "igdb_rating_count": 1482
         },
         "613c0c1cb83a7a622cdcb485fe4e7d6c": {
             "title": "CHRONO TRIGGER",
@@ -569,13 +395,15 @@
             "platform": "PC",
             "playtime": 0,
             "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
+            "developer": "Square Enix",
+            "release_date": "2018-02-27",
+            "summary": "As the definitive version of Chrono Trigger, not only have the controls been updated, the graphics and sound have also been revamped to make your adventure even more fun and enjoyable to play. To complete your journey, also included is the mysterious ‘Dimensional Vortex’ dungeon and the forgotten ‘Lost Sanctum’ dungeon. Meet the challenges presented to you and long-lost secrets may be revealed...",
+            "cover_image_id": "co87df",
             "tracking_exe": "D:\\SteamLibrary\\steamapps\\common\\Chrono Trigger\\Chrono Trigger.exe",
             "game_dir": "D:\\SteamLibrary\\steamapps\\common\\Chrono Trigger",
-            "size": 864134161
+            "size": 864134161,
+            "igdb_score": 79.9,
+            "igdb_rating_count": 23
         },
         "0ac24c11fe489f2c43ac2b3be0fa4c19": {
             "title": "Tales of Arise",
@@ -590,34 +418,6 @@
             "tracking_exe": "D:\\SteamLibrary\\steamapps\\common\\Tales of Arise\\Arise\\Binaries\\Win64\\Tales of Arise.exe",
             "game_dir": "D:\\SteamLibrary\\steamapps\\common\\Tales of Arise",
             "size": 52214400799
-        },
-        "45d5c783dbe95e5df28ee1d29640030e": {
-            "title": "juneberryPublic",
-            "path": "D:\\Games\\juneberryPublic\\Binaries\\Win64\\Outlast2.exe",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "D:\\Games\\juneberryPublic\\Binaries\\Win64\\Outlast2.exe",
-            "game_dir": "D:\\Games\\juneberryPublic",
-            "size": 27272594799
-        },
-        "4a3075645d95909b88013681b4bc95a5": {
-            "title": "juneberryPublic",
-            "path": "D:\\games\\juneberryPublic\\Binaries\\Win64\\Outlast2.exe",
-            "platform": "PC",
-            "playtime": 0,
-            "sessions": [],
-            "developer": "Unknown Developer",
-            "release_date": "N/A",
-            "summary": "Local PC Game",
-            "cover_image_id": "",
-            "tracking_exe": "D:\\games\\juneberryPublic\\Binaries\\Win64\\Outlast2.exe",
-            "game_dir": "D:\\games\\juneberryPublic",
-            "size": 27272594799
         }
     },
     "theme": "Modern Dark",
@@ -628,13 +428,13 @@
     ],
     "recently_played": [
         "36b8cec915db1e23d5cf4dc0dc81ba6f",
+        "c4f0a88f1b8085e5ad337037399d9765",
         "fc1e1d5791e65717fc12d077f7e526c6",
         "47c76adc394d83aa765e6af7e2eae154",
         "fe6d2d927f23c692f4e0a5daa1b0e0b9",
         "bddd21f80e7b67df61973fb0ece23302",
         "faa5720d8c7eb0b4f750c3bbf3890ba3",
         "c0c8d47f62c4a8f58fb23f7e3ca703d3",
-        "d9556f6494f9e3778f227c0bcb35c938",
         "23200c9b285078dcb4f8e6116afcfdf4"
     ],
     "platform_defaults": {},
@@ -642,6 +442,9 @@
     "igdb_client_secret": "1awnmd8i58y7upfzjk7jbz87ut26kj",
     "auto_scan_on_startup": false,
     "minimize_to_tray_on_launch": true,
+    "mute_sound_effects": false,
+    "sound_effects_volume": 70,
+    "sidebar_sound_effects_volume": 70,
     "list_icon_size": 51,
     "window_geometry": "01d9d0cb00030000000000f7000000cc0000060100000466000000f7000000eb000006010000046600000000000000000a00000000f7000000eb0000060100000466",
     "window_state": "000000ff00000000fd000000000000050b0000034000000004000000040000000800000008fc00000001000000020000000100000016004d00610069006e0054006f006f006c0042006100720100000000ffffffff0000000000000000",

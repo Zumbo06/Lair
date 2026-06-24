@@ -16,11 +16,84 @@ from PyQt6.QtWidgets import (
     QStatusBar, QListWidgetItem, QPushButton, QMessageBox, QFileDialog, QLabel,
     QDialog, QLineEdit, QDialogButtonBox, QSplitter, QComboBox, QTreeWidget,
     QTreeWidgetItem, QCheckBox, QFormLayout, QGroupBox, QStackedWidget, QFrame, QMenu,
-    QTreeWidgetItem, QCheckBox, QFormLayout, QGroupBox, QStackedWidget, QFrame, QMenu,
-    QTextEdit, QSystemTrayIcon, QProgressBar
+    QTextEdit, QSystemTrayIcon, QProgressBar, QSlider
 )
 from PyQt6.QtGui import QFont, QIcon, QPixmap, QColor, QBrush, QPen, QPainter, QLinearGradient, QAction
 from PyQt6.QtCore import Qt, QSize, QRect, pyqtSignal, QTimer
+
+# --- Global Button Click Sound Effect Hook ---
+_app_config_manager = None
+_click_sound_player = None
+_sidebar_sound_player = None
+
+def play_click_sound(*args):
+    global _app_config_manager, _click_sound_player
+    if _app_config_manager and _app_config_manager.config.get("mute_sound_effects", False):
+        return
+        
+    if _click_sound_player is None:
+        try:
+            from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+            from PyQt6.QtCore import QUrl
+            _click_sound_player = QMediaPlayer()
+            _click_sound_player.audio_output = QAudioOutput()
+            _click_sound_player.setAudioOutput(_click_sound_player.audio_output)
+            
+            # Locate sound effect file in the absolute path
+            sound_dir = os.path.dirname(os.path.abspath(__file__))
+            sound_path = os.path.join(sound_dir, "sound", "sound effect.m4a")
+            _click_sound_player.setSource(QUrl.fromLocalFile(sound_path))
+        except Exception as e:
+            print(f"[WARNING] Could not initialize button click sound player: {e}")
+            return
+            
+    if _click_sound_player:
+        vol = _app_config_manager.config.get("sound_effects_volume", 70) / 100.0 if _app_config_manager else 0.7
+        try:
+            _click_sound_player.audio_output.setVolume(vol)
+        except Exception:
+            pass
+        _click_sound_player.setPosition(0)
+        _click_sound_player.play()
+
+def play_sidebar_sound(*args):
+    global _app_config_manager, _sidebar_sound_player
+    if _app_config_manager and _app_config_manager.config.get("mute_sound_effects", False):
+        return
+        
+    if _sidebar_sound_player is None:
+        try:
+            from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+            from PyQt6.QtCore import QUrl
+            _sidebar_sound_player = QMediaPlayer()
+            _sidebar_sound_player.audio_output = QAudioOutput()
+            _sidebar_sound_player.setAudioOutput(_sidebar_sound_player.audio_output)
+            
+            # Locate sound effect file in the absolute path
+            sound_dir = os.path.dirname(os.path.abspath(__file__))
+            sound_path = os.path.join(sound_dir, "sound", "side bar sound effect.m4a")
+            _sidebar_sound_player.setSource(QUrl.fromLocalFile(sound_path))
+        except Exception as e:
+            print(f"[WARNING] Could not initialize sidebar sound player: {e}")
+            return
+            
+    if _sidebar_sound_player:
+        vol = _app_config_manager.config.get("sidebar_sound_effects_volume", 70) / 100.0 if _app_config_manager else 0.7
+        try:
+            _sidebar_sound_player.audio_output.setVolume(vol)
+        except Exception:
+            pass
+        _sidebar_sound_player.setPosition(0)
+        _sidebar_sound_player.play()
+
+# Monkeypatch QPushButton.__init__ to connect the clicked signal
+original_qpushbutton_init = QPushButton.__init__
+
+def patched_qpushbutton_init(self, *args, **kwargs):
+    original_qpushbutton_init(self, *args, **kwargs)
+    self.clicked.connect(play_click_sound)
+
+QPushButton.__init__ = patched_qpushbutton_init
 
 # --- Import Modular Subcomponents ---
 from constants import Constants
@@ -51,7 +124,14 @@ class EmulatorHubWindow(QMainWindow):
 
     def __init__(self, config_manager: ConfigManager):
         super().__init__()
+        global _app_config_manager
+        _app_config_manager = config_manager
         self.config_manager = config_manager
+        
+        # Initialize high contrast setting
+        high_contrast = self.config_manager.config.get("high_contrast", False)
+        Constants.apply_high_contrast(high_contrast)
+        
         self.image_cache = {} # Local in-memory QPixmap cache
         self._cover_cache = {}  # Hash -> QIcon cache for covers (avoids disk reads on every refresh)
         self.enriching_hashes = set() # Track games currently fetching metadata to prevent duplicate threads
@@ -224,6 +304,11 @@ class EmulatorHubWindow(QMainWindow):
                 background-color: {Constants.C_BORDER};
                 border-color: {Constants.C_ACCENT_CYAN};
             }}
+            QPushButton:checked {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {Constants.C_ACCENT_CYAN}, stop:1 #00bcd4);
+                color: #000000;
+                border-color: {Constants.C_ACCENT_CYAN};
+            }}
             QLineEdit, QComboBox, QTextEdit {{
                 background-color: {Constants.C_BG_DARK};
                 border: 1.5px solid {Constants.C_BORDER};
@@ -231,8 +316,14 @@ class EmulatorHubWindow(QMainWindow):
                 padding: 6px;
                 color: #ffffff;
             }}
+            QLineEdit:hover, QComboBox:hover, QTextEdit:hover {{
+                border-color: rgba(0, 229, 255, 0.4);
+            }}
             QLineEdit:focus, QComboBox:focus, QTextEdit:focus {{
                 border-color: {Constants.C_ACCENT_CYAN};
+            }}
+            QCheckBox:hover {{
+                color: #ffffff;
             }}
             QComboBox::drop-down {{
                 border: none;
@@ -386,9 +477,18 @@ class EmulatorHubWindow(QMainWindow):
         btn.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
         btn.setFlat(True)
         if active:
-            btn.setStyleSheet(f"color: {Constants.C_ACCENT_CYAN}; border-bottom: 2.5px solid {Constants.C_ACCENT_CYAN}; background-color: transparent;")
+            btn.setStyleSheet(f"color: {Constants.C_ACCENT_CYAN}; border-bottom: 2.5px solid {Constants.C_ACCENT_CYAN}; background-color: transparent; padding-bottom: 2px;")
         else:
-            btn.setStyleSheet("color: #8f98a0; border: none; background-color: transparent;")
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    color: #8f98a0;
+                    border: none;
+                    background-color: transparent;
+                }}
+                QPushButton:hover {{
+                    color: #ffffff;
+                }}
+            """)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         return btn
 
@@ -399,9 +499,18 @@ class EmulatorHubWindow(QMainWindow):
         buttons = [self.btn_lib, self.btn_dash, self.btn_emu, self.btn_set]
         for idx, btn in enumerate(buttons):
             if idx == index:
-                btn.setStyleSheet(f"color: {Constants.C_ACCENT_CYAN}; border-bottom: 2.5px solid {Constants.C_ACCENT_CYAN}; background-color: transparent;")
+                btn.setStyleSheet(f"color: {Constants.C_ACCENT_CYAN}; border-bottom: 2.5px solid {Constants.C_ACCENT_CYAN}; background-color: transparent; padding-bottom: 2px;")
             else:
-                btn.setStyleSheet("color: #8f98a0; border: none; background-color: transparent;")
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        color: #8f98a0;
+                        border: none;
+                        background-color: transparent;
+                    }}
+                    QPushButton:hover {{
+                        color: #ffffff;
+                    }}
+                """)
                 
         # If stats page, refresh metrics
         if index == 1:
@@ -495,6 +604,7 @@ class EmulatorHubWindow(QMainWindow):
             }}
         """)
         self.sidebar_tree.itemClicked.connect(self.on_sidebar_item_clicked)
+        self.sidebar_tree.itemClicked.connect(play_sidebar_sound)
         sidebar_layout.addWidget(self.sidebar_tree)
         
         splitter.addWidget(sidebar)
@@ -613,6 +723,7 @@ class EmulatorHubWindow(QMainWindow):
         self.games_list.verticalScrollBar().setSingleStep(100)
         self.games_list.setSpacing(8)
         self.games_list.itemClicked.connect(self.on_game_selected)
+        self.games_list.itemClicked.connect(play_sidebar_sound)
         self.games_list.currentItemChanged.connect(lambda curr, prev: self.on_game_selected(curr))
         self.games_list.itemDoubleClicked.connect(self.launch_selected_game)
         self.games_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -915,15 +1026,200 @@ class EmulatorHubWindow(QMainWindow):
         self.chk_no_autoscan.setChecked(not self.config_manager.config.get("auto_scan_on_startup", True))
         self.chk_no_autoscan.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY}; font-weight: normal;")
         
+        self.chk_mute_sound = QCheckBox("Mute sound effects")
+        self.chk_mute_sound.setChecked(self.config_manager.config.get("mute_sound_effects", False))
+        self.chk_mute_sound.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY}; font-weight: normal;")
+        
+        self.chk_high_contrast = QCheckBox("Enable High Contrast Mode")
+        self.chk_high_contrast.setChecked(self.config_manager.config.get("high_contrast", False))
+        self.chk_high_contrast.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY}; font-weight: normal;")
+        
+        # General Sound Effect Volume Slider
+        sfx_vol_layout = QHBoxLayout()
+        lbl_sfx_vol = QLabel("General Sound Effect Volume:")
+        lbl_sfx_vol.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY}; font-weight: normal;")
+        self.slider_sfx_vol = QSlider(Qt.Orientation.Horizontal)
+        self.slider_sfx_vol.setRange(0, 100)
+        self.slider_sfx_vol.setValue(self.config_manager.config.get("sound_effects_volume", 70))
+        self.slider_sfx_vol.setFixedWidth(200)
+        self.slider_sfx_vol.setStyleSheet(f"""
+            QSlider::groove:horizontal {{
+                border: 1px solid {Constants.C_BORDER};
+                height: 6px;
+                background: {Constants.C_BG_DARK};
+                border-radius: 3px;
+            }}
+            QSlider::sub-page:horizontal {{
+                background: {Constants.C_ACCENT_VIOLET};
+                border-radius: 3px;
+            }}
+            QSlider::handle:horizontal {{
+                background: {Constants.C_ACCENT_CYAN};
+                border: 1px solid {Constants.C_BORDER};
+                width: 14px;
+                margin-top: -4px;
+                margin-bottom: -4px;
+                border-radius: 7px;
+            }}
+            QSlider::handle:horizontal:hover {{
+                background: {Constants.C_VIOLET_HOVER};
+            }}
+            QSlider::groove:horizontal:disabled {{
+                background: {Constants.C_BORDER};
+            }}
+            QSlider::sub-page:horizontal:disabled {{
+                background: {Constants.C_TEXT_MUTED};
+            }}
+            QSlider::handle:horizontal:disabled {{
+                background: {Constants.C_TEXT_MUTED};
+            }}
+        """)
+        lbl_sfx_vol_val = QLabel(f"{self.slider_sfx_vol.value()}%")
+        lbl_sfx_vol_val.setStyleSheet(f"color: {Constants.C_TEXT_SECONDARY}; min-width: 35px;")
+        
+        sfx_vol_layout.addWidget(lbl_sfx_vol)
+        sfx_vol_layout.addWidget(self.slider_sfx_vol)
+        sfx_vol_layout.addWidget(lbl_sfx_vol_val)
+        sfx_vol_layout.addStretch()
+
+        # Sidebar Sound Effect Volume Slider
+        sidebar_vol_layout = QHBoxLayout()
+        lbl_sidebar_vol = QLabel("Sidebar Sound Effect Volume:")
+        lbl_sidebar_vol.setStyleSheet(f"color: {Constants.C_TEXT_PRIMARY}; font-weight: normal;")
+        self.slider_sidebar_vol = QSlider(Qt.Orientation.Horizontal)
+        self.slider_sidebar_vol.setRange(0, 100)
+        self.slider_sidebar_vol.setValue(self.config_manager.config.get("sidebar_sound_effects_volume", 70))
+        self.slider_sidebar_vol.setFixedWidth(200)
+        self.slider_sidebar_vol.setStyleSheet(f"""
+            QSlider::groove:horizontal {{
+                border: 1px solid {Constants.C_BORDER};
+                height: 6px;
+                background: {Constants.C_BG_DARK};
+                border-radius: 3px;
+            }}
+            QSlider::sub-page:horizontal {{
+                background: {Constants.C_ACCENT_VIOLET};
+                border-radius: 3px;
+            }}
+            QSlider::handle:horizontal {{
+                background: {Constants.C_ACCENT_CYAN};
+                border: 1px solid {Constants.C_BORDER};
+                width: 14px;
+                margin-top: -4px;
+                margin-bottom: -4px;
+                border-radius: 7px;
+            }}
+            QSlider::handle:horizontal:hover {{
+                background: {Constants.C_VIOLET_HOVER};
+            }}
+            QSlider::groove:horizontal:disabled {{
+                background: {Constants.C_BORDER};
+            }}
+            QSlider::sub-page:horizontal:disabled {{
+                background: {Constants.C_TEXT_MUTED};
+            }}
+            QSlider::handle:horizontal:disabled {{
+                background: {Constants.C_TEXT_MUTED};
+            }}
+        """)
+        lbl_sidebar_vol_val = QLabel(f"{self.slider_sidebar_vol.value()}%")
+        lbl_sidebar_vol_val.setStyleSheet(f"color: {Constants.C_TEXT_SECONDARY}; min-width: 35px;")
+        
+        sidebar_vol_layout.addWidget(lbl_sidebar_vol)
+        sidebar_vol_layout.addWidget(self.slider_sidebar_vol)
+        sidebar_vol_layout.addWidget(lbl_sidebar_vol_val)
+        sidebar_vol_layout.addStretch()
+
+        def update_sliders_enabled():
+            is_muted = self.chk_mute_sound.isChecked()
+            self.slider_sfx_vol.setEnabled(not is_muted)
+            self.slider_sidebar_vol.setEnabled(not is_muted)
+            lbl_sfx_vol.setEnabled(not is_muted)
+            lbl_sidebar_vol.setEnabled(not is_muted)
+            lbl_sfx_vol_val.setEnabled(not is_muted)
+            lbl_sidebar_vol_val.setEnabled(not is_muted)
+
         def save_behavior():
             self.config_manager.config["minimize_to_tray_on_launch"] = self.chk_tray.isChecked()
             self.config_manager.config["auto_scan_on_startup"] = not self.chk_no_autoscan.isChecked()
+            self.config_manager.config["mute_sound_effects"] = self.chk_mute_sound.isChecked()
             self.config_manager.save_config()
+            update_sliders_enabled()
             
         self.chk_tray.stateChanged.connect(save_behavior)
         self.chk_no_autoscan.stateChanged.connect(save_behavior)
+        self.chk_mute_sound.stateChanged.connect(save_behavior)
+
+        def update_sfx_vol(val):
+            lbl_sfx_vol_val.setText(f"{val}%")
+            self.config_manager.config["sound_effects_volume"] = val
+            self.config_manager.save_config()
+            global _click_sound_player
+            if _click_sound_player and hasattr(_click_sound_player, 'audio_output') and _click_sound_player.audio_output:
+                try:
+                    _click_sound_player.audio_output.setVolume(val / 100.0)
+                except Exception:
+                    pass
+            
+        def update_sidebar_vol(val):
+            lbl_sidebar_vol_val.setText(f"{val}%")
+            self.config_manager.config["sidebar_sound_effects_volume"] = val
+            self.config_manager.save_config()
+            global _sidebar_sound_player
+            if _sidebar_sound_player and hasattr(_sidebar_sound_player, 'audio_output') and _sidebar_sound_player.audio_output:
+                try:
+                    _sidebar_sound_player.audio_output.setVolume(val / 100.0)
+                except Exception:
+                    pass
+
+        self.slider_sfx_vol.valueChanged.connect(update_sfx_vol)
+        self.slider_sidebar_vol.valueChanged.connect(update_sidebar_vol)
+        
+        self.slider_sfx_vol.sliderReleased.connect(play_click_sound)
+        self.slider_sidebar_vol.sliderReleased.connect(play_sidebar_sound)
+
+        def handle_high_contrast_change():
+            current_setting = self.config_manager.config.get("high_contrast", False)
+            new_val = self.chk_high_contrast.isChecked()
+            if current_setting == new_val:
+                return
+                
+            self.config_manager.config["high_contrast"] = new_val
+            self.config_manager.save_config()
+            Constants.apply_high_contrast(new_val)
+            
+            reply = QMessageBox.question(
+                self,
+                "Restart Required",
+                "Theme changed. Lair needs to restart to apply High Contrast Mode. Restart now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                QApplication.quit()
+                import subprocess
+                subprocess.Popen([sys.executable] + sys.argv)
+            else:
+                QMessageBox.information(
+                    self,
+                    "Restart Deferred",
+                    "High Contrast Mode changes will apply on the next startup.",
+                    QMessageBox.StandardButton.Ok
+                )
+
+        self.chk_high_contrast.stateChanged.connect(handle_high_contrast_change)
+
+        # Initialize enabled state
+        update_sliders_enabled()
+
         behavior_layout.addWidget(self.chk_tray)
         behavior_layout.addWidget(self.chk_no_autoscan)
+        behavior_layout.addWidget(self.chk_mute_sound)
+        behavior_layout.addWidget(self.chk_high_contrast)
+        behavior_layout.addSpacing(10)
+        behavior_layout.addLayout(sfx_vol_layout)
+        behavior_layout.addLayout(sidebar_vol_layout)
         content_layout.addWidget(box_behavior)
         
         scroll.setWidget(content)
