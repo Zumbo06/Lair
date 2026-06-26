@@ -148,6 +148,18 @@ class IGDBClient:
             r'Disc\s?\d+|CD\s?\d+|En,Fr,De|[A-Z]{2,3}(?:,[A-Z]{2,3})*)[\)\]]\s*',
             ' ', clean_title, flags=re.IGNORECASE
         ).strip()
+        # Strip appended version strings like "-1.2.4.0-portable" or "-1.0-beta"
+        clean_title = re.sub(r'\s*-\s*\d[\d\.]*-\S+$', '', clean_title, flags=re.IGNORECASE).strip()
+        # Convert dots to spaces (but not between digits, e.g. "3.0" stays)
+        # Handles cases like "DLSS.Swapper" -> "DLSS Swapper"
+        clean_title = re.sub(r'(?<!\d)\.(?!\d)', ' ', clean_title).strip()
+        # Split CamelCase — only when the entire title has NO spaces (compressed folder name)
+        # e.g. "SaintsRowTheThird" -> "Saints Row The Third"
+        # but "GoldenEye 007" stays untouched
+        if ' ' not in clean_title:
+            clean_title = re.sub(r'([a-z])([A-Z])', r'\1 \2', clean_title).strip()
+        # Normalize multiple spaces created by the above transformations
+        clean_title = re.sub(r'\s+', ' ', clean_title).strip()
 
         
         # 2. Only perform expensive serial lookups if the title is just a serial code
@@ -329,7 +341,23 @@ class IGDBClient:
                 return base_score + platform_priority
                 
             results.sort(key=get_auto_match_score)
-            
+
+            # Minimum quality gate: reject the top result if it has NO keyword overlap
+            # with our query (base_score == 5). This prevents caching wrong matches
+            # like "The Darkness" -> "Thief: The Dark Project".
+            def _title_has_match(game):
+                g_name = game.get("name", "").lower().strip()
+                g_clean = re.sub(r'\[.*?\]|\(.*?\)', '', g_name).strip()
+                g_clean = re.sub(r'[™®©℠]', '', g_clean).strip()
+                q_name = clean_title.lower().strip()
+                q_words = q_name.split()
+                # Accept if any non-trivial query word appears in the game name
+                stopwords = {'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or'}
+                significant_words = [w for w in q_words if w not in stopwords and len(w) > 1]
+                if not significant_words:
+                    return True  # Nothing meaningful to filter on
+                return any(w in g_clean for w in significant_words)
+
             selected_game = None
             if target_platform_ids:
                 for game in results:
@@ -341,19 +369,30 @@ class IGDBClient:
                                 game_plat_ids.append(gp)
                             elif isinstance(gp, dict) and "id" in gp:
                                 game_plat_ids.append(gp["id"])
-                    
+
                     if any(pid in target_platform_ids for pid in game_plat_ids):
+                        if _title_has_match(game):
+                            selected_game = game
+                            break
+
+                if not selected_game:
+                    # No platform-exact match — fall back to best title-scored result
+                    # that passes the minimum quality gate.
+                    for game in results:
+                        if _title_has_match(game):
+                            print(f"[IGDB] No platform-exact match for '{clean_title}' on {platform} — using best title match.")
+                            selected_game = game
+                            break
+            else:
+                # No platform filter — pick best title match that passes quality gate
+                for game in results:
+                    if _title_has_match(game):
                         selected_game = game
                         break
-                
-                if not selected_game:
-                    # No platform-exact match — fall back to the best title-scored result
-                    # so the game still gets metadata (developer, summary, cover, score).
-                    # The igdb_platform_ids field will let the caller auto-correct platform.
-                    print(f"[IGDB] No platform-exact match for '{clean_title}' on {platform} — using best title match.")
-                    selected_game = results[0]
-            else:
-                selected_game = results[0]
+
+            if not selected_game:
+                # All results failed the quality gate — don't cache garbage
+                return None
             
             game_data = selected_game
             
@@ -585,3 +624,53 @@ class IGDBClient:
         except Exception as e:
             print(f"Error downloading cover {image_id}: {e}")
         return False
+
+    def test_connection(self) -> tuple[bool, str]:
+        """Tests the credentials and connection to Twitch and IGDB.
+        Returns a tuple of (success_boolean, detail_string).
+        """
+        if not requests:
+            return False, "Python 'requests' library is not installed."
+        
+        if not self.is_configured():
+            return False, "Twitch Client ID and Client Secret are not configured."
+            
+        url = "https://id.twitch.tv/oauth2/token"
+        params = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "grant_type": "client_credentials"
+        }
+        
+        # Test Auth
+        try:
+            response = self._session.post(url, params=params, timeout=8)
+            if response.status_code != 200:
+                return False, f"Twitch OAuth Authentication failed with status code {response.status_code}: {response.text}"
+            
+            data = response.json()
+            token = data.get("access_token")
+            if not token:
+                return False, f"Access token not found in Twitch response: {response.text}"
+        except Exception as e:
+            return False, f"Twitch Authentication connection error: {e}"
+            
+        # Test IGDB Query
+        query_url = "https://api.igdb.com/v4/games"
+        headers = {
+            "Client-ID": self.client_id,
+            "Authorization": f"Bearer {token}"
+        }
+        body = 'search "Super Mario Sunshine"; fields name; limit 1;'
+        try:
+            response = self._session.post(query_url, headers=headers, data=body, timeout=8)
+            if response.status_code != 200:
+                return False, f"IGDB API query failed with status code {response.status_code}: {response.text}"
+            
+            res = response.json()
+            if not res or not isinstance(res, list) or len(res) == 0:
+                return False, f"IGDB query returned unexpected or empty response: {response.text}"
+            
+            return True, f"Successfully authenticated and retrieved game '{res[0].get('name')}'."
+        except Exception as e:
+            return False, f"IGDB API connection error: {e}"

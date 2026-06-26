@@ -116,12 +116,12 @@ Pillow>=9.0.0    # Enhanced image processing
 |----------|-----------|
 | PlayStation 4 | `.pkg` |
 | PlayStation 3 | `.sfb` + folder detection |
-| PlayStation 2 | `.iso` |
+| PlayStation 2 | `.iso` (header/folder auto-detection) |
 | PlayStation 1 | `.chd`, `.cue` |
 | PSP | `.cso` |
 | Nintendo Switch | `.nsp`, `.xci` |
-| Wii | `.wbfs` |
-| GameCube | `.gcz`, `.rvz` |
+| Wii | `.wbfs`, `.iso` (header/folder auto-detection) |
+| GameCube | `.gcm`, `.gcz`, `.rvz`, `.iso` (header/folder auto-detection) |
 | Nintendo 64 | `.z64` |
 | Super Nintendo | `.sfc` |
 | NES | `.nes` |

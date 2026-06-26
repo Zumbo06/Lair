@@ -988,6 +988,11 @@ class EmulatorHubWindow(QMainWindow):
         self.edit_client_secret.textChanged.connect(self.save_settings)
         igdb_layout.addRow("Twitch Client Secret:", self.edit_client_secret)
         
+        self.btn_test_api = QPushButton("⚡  Test API Connection")
+        self.btn_test_api.setFixedWidth(200)
+        self.btn_test_api.clicked.connect(self.run_api_connection_test)
+        igdb_layout.addRow("", self.btn_test_api)
+        
         tip_lbl = QLabel("How to get keys: Register a developer application on twitch at dev.twitch.tv dashboard for free, and fetch posters instantly!")
         tip_lbl.setFont(QFont("Segoe UI", 9))
         tip_lbl.setWordWrap(True)
@@ -1358,9 +1363,29 @@ class EmulatorHubWindow(QMainWindow):
             games_to_fetch = []
             for p_game in all_pc_games:
                 g_path = p_game["path"]
+                
+                # Check duplicate exe file
+                p_exe = p_game.get("tracking_exe")
+                is_duplicate = False
+                if p_exe:
+                    norm_exe = os.path.normpath(p_exe).lower()
+                    if norm_exe in existing_exes:
+                        is_duplicate = True
+                if not is_duplicate and g_path and g_path.lower().endswith(".exe"):
+                    norm_path = os.path.normpath(g_path).lower()
+                    if norm_path in existing_exes:
+                        is_duplicate = True
+                
+                if is_duplicate:
+                    continue
+
                 g_hash = hashlib.md5(g_path.encode('utf-8')).hexdigest()
                 if g_hash not in self.config_manager.config["game_metadata"]:
                     games_to_fetch.append((g_hash, p_game))
+                    if p_exe:
+                        existing_exes.add(os.path.normpath(p_exe).lower())
+                    if g_path and g_path.lower().endswith(".exe"):
+                        existing_exes.add(os.path.normpath(g_path).lower())
             
             if games_to_fetch:
                 import concurrent.futures
@@ -1449,11 +1474,18 @@ class EmulatorHubWindow(QMainWindow):
             
             games_to_fetch = []
             existing_paths = set()
+            existing_exes = set()
             for meta in self.config_manager.config["game_metadata"].values():
                 if meta.get("path"):
                     existing_paths.add(os.path.normpath(meta["path"]).lower())
                 if meta.get("game_dir"):
                     existing_paths.add(os.path.normpath(meta["game_dir"]).lower())
+                t_exe = meta.get("tracking_exe")
+                if t_exe:
+                    existing_exes.add(os.path.normpath(t_exe).lower())
+                g_path = meta.get("path")
+                if g_path and g_path.lower().endswith(".exe"):
+                    existing_exes.add(os.path.normpath(g_path).lower())
 
             for p_game in all_pc_games:
                 g_path = p_game["path"]
@@ -1466,11 +1498,30 @@ class EmulatorHubWindow(QMainWindow):
                 if norm_dir and norm_dir in existing_paths:
                     continue
                     
+                # Check duplicate exe file
+                p_exe = p_game.get("tracking_exe")
+                is_duplicate = False
+                if p_exe:
+                    norm_exe = os.path.normpath(p_exe).lower()
+                    if norm_exe in existing_exes:
+                        is_duplicate = True
+                if not is_duplicate and g_path and g_path.lower().endswith(".exe"):
+                    norm_path_val = os.path.normpath(g_path).lower()
+                    if norm_path_val in existing_exes:
+                        is_duplicate = True
+                
+                if is_duplicate:
+                    continue
+
                 g_hash = hashlib.md5(g_path.encode('utf-8')).hexdigest()
                 if g_hash not in self.config_manager.config["game_metadata"]:
                     games_to_fetch.append((g_hash, p_game))
                     if norm_path: existing_paths.add(norm_path)
                     if norm_dir: existing_paths.add(norm_dir)
+                    if p_exe:
+                        existing_exes.add(os.path.normpath(p_exe).lower())
+                    if g_path and g_path.lower().endswith(".exe"):
+                        existing_exes.add(os.path.normpath(g_path).lower())
             
             if games_to_fetch:
                 import concurrent.futures
@@ -1586,6 +1637,7 @@ class EmulatorHubWindow(QMainWindow):
         
         PLATFORM_SUFFIXES = {
             ".iso": "PlayStation 2",
+            ".gcm": "GameCube",
             ".gcz": "GameCube",
             ".rvz": "GameCube",
             ".wbfs": "Wii",
@@ -1667,6 +1719,7 @@ class EmulatorHubWindow(QMainWindow):
                     dirs.remove(sce_sys_dir)
                     
                 # 2. File suffix scanning
+                AMBIGUOUS_EXTENSIONS = {".iso", ".chd", ".cue", ".bin"}
                 for f in files:
                     file_path = Path(root) / f
                     suffix = file_path.suffix.lower()
@@ -1675,11 +1728,25 @@ class EmulatorHubWindow(QMainWindow):
                         # Avoid duplicates for PS3 disc file if folder was scanned
                         if platform == "PlayStation 3" and file_path.name.upper() == "PS3_DISC.SFB":
                             continue
+                        target_path = str(file_path)
+                        platform_uncertain = False
+                        
+                        header_platform = self._detect_platform_from_header(target_path)
+                        folder_platform = self._detect_platform_from_path(target_path)
+                        
+                        if header_platform:
+                            platform = header_platform
+                        elif folder_platform:
+                            platform = folder_platform
+                        elif suffix in AMBIGUOUS_EXTENSIONS:
+                            platform_uncertain = True
+                            
                         roms_found.append({
                             "title": file_path.stem,
-                            "path": str(file_path),
+                            "path": target_path,
                             "platform": platform,
-                            "size": file_path.stat().st_size
+                            "size": file_path.stat().st_size,
+                            "platform_uncertain": platform_uncertain
                         })
                         
         # 3. Automatically locate and scan RPCS3 dev_hdd0/game and games folders if RPCS3 is configured!
@@ -1821,11 +1888,18 @@ class EmulatorHubWindow(QMainWindow):
             except Exception as e:
                 print(f"Error scanning shadPS4 games folder {game_folder}: {e}")
         existing_paths = set()
+        existing_exes = set()
         for meta in self.config_manager.config["game_metadata"].values():
             if meta.get("path"):
                 existing_paths.add(os.path.normpath(meta["path"]).lower())
             if meta.get("game_dir"):
                 existing_paths.add(os.path.normpath(meta["game_dir"]).lower())
+            t_exe = meta.get("tracking_exe")
+            if t_exe:
+                existing_exes.add(os.path.normpath(t_exe).lower())
+            g_path = meta.get("path")
+            if g_path and g_path.lower().endswith(".exe"):
+                existing_exes.add(os.path.normpath(g_path).lower())
 
         added_count = 0
         games_to_fetch = []
@@ -1835,11 +1909,22 @@ class EmulatorHubWindow(QMainWindow):
             if norm_path and norm_path in existing_paths:
                 continue
                 
+            # Check duplicate exe/xex file
+            is_duplicate = False
+            if g_path and (g_path.lower().endswith(".exe") or g_path.lower().endswith(".xex")):
+                if norm_path in existing_exes:
+                    is_duplicate = True
+            
+            if is_duplicate:
+                continue
+
             g_hash = hashlib.md5(g_path.encode('utf-8')).hexdigest()
             if g_hash not in self.config_manager.config["game_metadata"]:
                 games_to_fetch.append((g_hash, rom))
                 if norm_path:
                     existing_paths.add(norm_path)
+                    if g_path.lower().endswith(".exe") or g_path.lower().endswith(".xex"):
+                        existing_exes.add(norm_path)
                 
         if not games_to_fetch:
             self.load_game_cache()
@@ -1853,9 +1938,16 @@ class EmulatorHubWindow(QMainWindow):
             nonlocal added_count
             import concurrent.futures
             
+            _igdb_id_to_platform = {
+                pid: plat_name
+                for plat_name, ids in IGDBClient.IGDB_PLATFORM_IDS.items()
+                for pid in ids
+            }
+            
             def fetch_rom_meta(item):
                 ghash, r = item
-                details = self.igdb_client.fetch_game_details(r["title"], platform=r.get("platform"))
+                plat = r.get("platform") if not r.get("platform_uncertain") else None
+                details = self.igdb_client.fetch_game_details(r["title"], platform=plat)
                 return ghash, r, details
                 
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
@@ -1868,7 +1960,8 @@ class EmulatorHubWindow(QMainWindow):
                         
                     dev = "Unknown Developer"
                     rel = "N/A"
-                    summary = f"Local ROM for {r['platform']}"
+                    actual_platform = r["platform"]
+                    summary = f"Local ROM for {actual_platform}"
                     cover_id = ""
                     score = None
                     score_count = 0
@@ -1881,10 +1974,24 @@ class EmulatorHubWindow(QMainWindow):
                         score = details.get("igdb_score")
                         score_count = details.get("igdb_rating_count", 0)
                         
+                        # Auto-correct platform
+                        igdb_plat_ids = details.get("igdb_platform_ids", [])
+                        if igdb_plat_ids:
+                            current_igdb_ids = IGDBClient.IGDB_PLATFORM_IDS.get(actual_platform, [])
+                            platform_confirmed = any(pid in current_igdb_ids for pid in igdb_plat_ids)
+                            if not platform_confirmed:
+                                for pid in igdb_plat_ids:
+                                    if pid in _igdb_id_to_platform:
+                                        new_platform = _igdb_id_to_platform[pid]
+                                        if new_platform != actual_platform:
+                                            print(f"[IGDB] Auto-correcting platform for '{r['title']}': {actual_platform!r} -> {new_platform!r}")
+                                            actual_platform = new_platform
+                                        break
+                                        
                     self.config_manager.config["game_metadata"][ghash] = {
                         "title": r["title"],
                         "path": r["path"],
-                        "platform": r["platform"],
+                        "platform": actual_platform,
                         "playtime": 0,
                         "sessions": [],
                         "developer": dev,
@@ -2346,11 +2453,24 @@ class EmulatorHubWindow(QMainWindow):
     def _on_metadata_fetch_failed(self, game_hash: str, title: str):
         """Called on the UI thread if metadata enrichment failed or could not be found."""
         print(f"[IGDB] Could not find metadata for '{title}' (hash: {game_hash})")
+        # Increment failure counter. After 3 failures we suppress retries to save API quota.
+        # Using a counter (not a permanent flag) means fixing the API or title
+        # can be recovered from by manually triggering a re-fetch via the context menu.
+        meta = self.config_manager.config["game_metadata"].get(game_hash)
+        if meta:
+            failures = meta.get("igdb_fetch_failures", 0) + 1
+            meta["igdb_fetch_failures"] = failures
+            if failures >= 3:
+                meta["auto_fetch_disabled"] = True
+                print(f"[IGDB] Suppressing auto-fetch for '{title}' after {failures} failed attempts.")
+            self.config_manager.save_config()
         selected = self.games_list.currentItem()
         if selected:
             sel_data = selected.data(Qt.ItemDataRole.UserRole)
             if sel_data and sel_data.get("hash") == game_hash:
                 self.statusBar().showMessage(f"❌ Couldn't find game details for '{title}' on IGDB.", 4000)
+
+
 
     def on_game_selected(self, item):
         if not item:
@@ -2947,7 +3067,7 @@ class EmulatorHubWindow(QMainWindow):
                 scan_folder_for_exes(os.path.normpath(folder))
                     
         def browse_file():
-            file_filter = "Game Files (*.iso *.bin *.cue *.chd *.cso *.nsp *.xci *.gcz *.rvz *.wbfs *.gba *.gbc *.gb *.nds *.3ds *.nes *.sfc *.z64 *.sfb *.pkg *.xex *.gdf *.zar *.exe *.lnk);;All Files (*)"
+            file_filter = "Game Files (*.iso *.gcm *.bin *.cue *.chd *.cso *.nsp *.xci *.gcz *.rvz *.wbfs *.gba *.gbc *.gb *.nds *.3ds *.nes *.sfc *.z64 *.sfb *.pkg *.xex *.gdf *.zar *.exe *.lnk);;All Files (*)"
             path, _ = QFileDialog.getOpenFileName(dialog, "Select Game File", "", file_filter)
             if path:
                 edit_path.setText(os.path.normpath(path))
@@ -2958,10 +3078,11 @@ class EmulatorHubWindow(QMainWindow):
                 combo_exe.clear()
                 combo_exe.setEnabled(False)
                 combo_exe.setPlaceholderText("Not needed — direct file selected")
-                # Auto-detect platform from extension
+                
+                # Auto-detect platform from header, path, or extension
                 suffix = Path(path).suffix.lower()
                 platform_map = {
-                    ".iso": "PlayStation 2", ".gcz": "GameCube", ".rvz": "GameCube",
+                    ".iso": "PlayStation 2", ".gcm": "GameCube", ".gcz": "GameCube", ".rvz": "GameCube",
                     ".wbfs": "Wii", ".nsp": "Nintendo Switch", ".xci": "Nintendo Switch",
                     ".gba": "Game Boy Advance", ".gbc": "Game Boy Color", ".gb": "Game Boy",
                     ".nds": "Nintendo DS", ".3ds": "Nintendo 3DS", ".nes": "NES",
@@ -2971,8 +3092,18 @@ class EmulatorHubWindow(QMainWindow):
                     ".xex": "Xbox 360", ".gdf": "Xbox 360", ".zar": "Xbox 360",
                     ".exe": "PC",
                 }
-                if suffix in platform_map:
-                    idx = combo_platform.findText(platform_map[suffix])
+                detected_platform = None
+                if suffix in (".iso", ".gcm"):
+                    detected_platform = EmulatorHubWindow._detect_platform_from_header(path)
+                
+                if not detected_platform:
+                    detected_platform = EmulatorHubWindow._detect_platform_from_path(path)
+                    
+                if not detected_platform and suffix in platform_map:
+                    detected_platform = platform_map[suffix]
+                    
+                if detected_platform:
+                    idx = combo_platform.findText(detected_platform)
                     if idx >= 0:
                         combo_platform.setCurrentIndex(idx)
 
@@ -3266,6 +3397,26 @@ class EmulatorHubWindow(QMainWindow):
                 current = current.parent
                 if current == current.parent:  # Filesystem root
                     break
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _detect_platform_from_header(file_path: str) -> str | None:
+        """Reads the magic number in the disc header of an ISO or GCM file to determine the platform."""
+        try:
+            if not os.path.exists(file_path):
+                return None
+            suffix = Path(file_path).suffix.lower()
+            if suffix not in (".iso", ".gcm"):
+                return None
+            with open(file_path, "rb") as f:
+                f.seek(0x1C)
+                magic = f.read(4)
+                if magic == b"\xc2\x33\x9f\x3d":
+                    return "GameCube"
+                elif magic == b"\x5d\x1c\x9e\xa3":
+                    return "Wii"
         except Exception:
             pass
         return None
@@ -3643,6 +3794,14 @@ class EmulatorHubWindow(QMainWindow):
         then an automatic IGDB enrichment batch is kicked off for all new entries."""
         try:
             new_games = []  # list of (g_hash, entry_dict) for newly discovered games
+            existing_exes = set()
+            for meta in self.config_manager.config.get("game_metadata", {}).values():
+                t_exe = meta.get("tracking_exe")
+                if t_exe:
+                    existing_exes.add(os.path.normpath(t_exe).lower())
+                g_path = meta.get("path")
+                if g_path and g_path.lower().endswith(".exe"):
+                    existing_exes.add(os.path.normpath(g_path).lower())
 
             # ----------------------------------------------------------------
             # 1. Quick PC game scan (Steam, Epic, Xbox, common folders)
@@ -3654,6 +3813,22 @@ class EmulatorHubWindow(QMainWindow):
 
             for pg in steam_games + epic_games + xbox_games + common_games:
                 g_path = pg["path"]
+                
+                # Check duplicate exe file
+                p_exe = pg.get("tracking_exe")
+                is_duplicate = False
+                if p_exe:
+                    norm_exe = os.path.normpath(p_exe).lower()
+                    if norm_exe in existing_exes:
+                        is_duplicate = True
+                if not is_duplicate and g_path and g_path.lower().endswith(".exe"):
+                    norm_path = os.path.normpath(g_path).lower()
+                    if norm_path in existing_exes:
+                        is_duplicate = True
+                
+                if is_duplicate:
+                    continue
+
                 g_hash = hashlib.md5(g_path.encode('utf-8')).hexdigest()
                 if g_hash not in self.config_manager.config["game_metadata"]:
                     entry = {
@@ -3672,12 +3847,16 @@ class EmulatorHubWindow(QMainWindow):
                     }
                     self.config_manager.config["game_metadata"][g_hash] = entry
                     new_games.append((g_hash, entry))
+                    if p_exe:
+                        existing_exes.add(os.path.normpath(p_exe).lower())
+                    if g_path and g_path.lower().endswith(".exe"):
+                        existing_exes.add(os.path.normpath(g_path).lower())
 
             # ----------------------------------------------------------------
             # 2. Quick ROM scan from library paths
             # ----------------------------------------------------------------
             PLATFORM_SUFFIXES = {
-                ".iso": "PlayStation 2", ".gcz": "GameCube", ".rvz": "GameCube",
+                ".iso": "PlayStation 2", ".gcm": "GameCube", ".gcz": "GameCube", ".rvz": "GameCube",
                 ".wbfs": "Wii", ".nsp": "Nintendo Switch", ".xci": "Nintendo Switch",
                 ".gba": "Game Boy Advance", ".gbc": "Game Boy Color", ".gb": "Game Boy",
                 ".nds": "Nintendo DS", ".3ds": "Nintendo 3DS", ".nes": "NES",
@@ -3763,13 +3942,26 @@ class EmulatorHubWindow(QMainWindow):
                             if platform == "PlayStation 3" and file_path.name.upper() == "PS3_DISC.SFB":
                                 continue
                             target_path = str(file_path)
+                            
+                            # Check duplicate exe/xex file
+                            is_duplicate = False
+                            norm_target = os.path.normpath(target_path).lower()
+                            if suffix in [".exe", ".xex"] and norm_target in existing_exes:
+                                is_duplicate = True
+                                
+                            if is_duplicate:
+                                continue
+
                             g_hash = hashlib.md5(target_path.encode('utf-8')).hexdigest()
                             if g_hash not in self.config_manager.config["game_metadata"]:
-                                # Try to refine platform using parent folder names
+                                # Try to refine platform using file header or parent folder names
+                                header_platform = self._detect_platform_from_header(target_path)
                                 folder_platform = self._detect_platform_from_path(target_path)
                                 platform_uncertain = False
 
-                                if folder_platform:
+                                if header_platform:
+                                    platform = header_platform
+                                elif folder_platform:
                                     # A parent folder explicitly names the platform — use it
                                     platform = folder_platform
                                 elif suffix in AMBIGUOUS_EXTENSIONS:
@@ -3787,6 +3979,8 @@ class EmulatorHubWindow(QMainWindow):
                                 }
                                 self.config_manager.config["game_metadata"][g_hash] = entry
                                 new_games.append((g_hash, entry))
+                                if suffix in [".exe", ".xex"]:
+                                    existing_exes.add(norm_target)
 
 
             # ----------------------------------------------------------------
@@ -3924,6 +4118,12 @@ class EmulatorHubWindow(QMainWindow):
                 # Track uncertain-platform games that IGDB also failed to resolve
                 uncertain_unresolved = []
 
+                _igdb_id_to_platform = {
+                    pid: plat_name
+                    for plat_name, ids in IGDBClient.IGDB_PLATFORM_IDS.items()
+                    for pid in ids
+                }
+
                 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                     futures = {executor.submit(_fetch_new_game_meta, item): item for item in new_games}
                     for future in concurrent.futures.as_completed(futures):
@@ -3947,6 +4147,22 @@ class EmulatorHubWindow(QMainWindow):
                         meta_ref["summary"] = details["summary"]
                         meta_ref["igdb_score"] = details.get("igdb_score")
                         meta_ref["igdb_rating_count"] = details.get("igdb_rating_count", 0)
+                        
+                        # Auto-correct platform from IGDB data if it differs from stored value
+                        igdb_plat_ids = details.get("igdb_platform_ids", [])
+                        if igdb_plat_ids:
+                            current_platform = meta_ref.get("platform", "")
+                            current_igdb_ids = IGDBClient.IGDB_PLATFORM_IDS.get(current_platform, [])
+                            platform_confirmed = any(pid in current_igdb_ids for pid in igdb_plat_ids)
+                            if not platform_confirmed:
+                                for pid in igdb_plat_ids:
+                                    if pid in _igdb_id_to_platform:
+                                        new_platform = _igdb_id_to_platform[pid]
+                                        if new_platform != current_platform:
+                                            print(f"[IGDB] Auto-correcting platform for '{meta_ref.get('title')}': {current_platform!r} -> {new_platform!r}")
+                                            meta_ref["platform"] = new_platform
+                                        break
+
                         # Clear uncertainty flag once IGDB resolved it
                         meta_ref.pop("platform_uncertain", None)
 
@@ -4597,6 +4813,39 @@ class EmulatorHubWindow(QMainWindow):
             self.config_manager.config["igdb_client_secret"],
             self.config_manager
         )
+
+    def run_api_connection_test(self):
+        self.btn_test_api.setEnabled(False)
+        self.btn_test_api.setText("Testing...")
+        self.statusBar().showMessage("Testing Twitch/IGDB API connection...")
+        
+        def run_test():
+            client_id = self.edit_client_id.text().strip()
+            client_secret = self.edit_client_secret.text().strip()
+            from api import IGDBClient as tester_class
+            tester = tester_class(client_id, client_secret, self.config_manager)
+            success, message = tester.test_connection()
+            
+            def show_result():
+                self.btn_test_api.setEnabled(True)
+                self.btn_test_api.setText("⚡  Test API Connection")
+                
+                if success:
+                    self.statusBar().showMessage("✅ API Connection successful!", 5000)
+                    QMessageBox.information(
+                        self, "API Test Successful",
+                        f"Twitch/IGDB API Connection is working!\n\n{message}"
+                    )
+                else:
+                    self.statusBar().showMessage("❌ API Connection failed!", 5000)
+                    QMessageBox.critical(
+                        self, "API Test Failed",
+                        f"Twitch/IGDB API Connection failed!\n\n{message}"
+                    )
+                    
+            QTimer.singleShot(0, show_result)
+            
+        threading.Thread(target=run_test, daemon=True).start()
 
 
 
