@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QTextEdit, QSystemTrayIcon, QProgressBar, QSlider
 )
 from PyQt6.QtGui import QFont, QIcon, QPixmap, QColor, QBrush, QPen, QPainter, QLinearGradient, QAction
-from PyQt6.QtCore import Qt, QSize, QRect, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, QSize, QRect, pyqtSignal, pyqtSlot, QTimer
 
 # --- Global Button Click Sound Effect Hook ---
 _app_config_manager = None
@@ -1281,6 +1281,7 @@ class EmulatorHubWindow(QMainWindow):
         except Exception as e:
             print(f"Error calculating game sizes: {e}")
 
+    @pyqtSlot()
     def _apply_calculated_sizes(self):
         """Update in-memory game data map with newly calculated sizes (called on main thread)."""
         metadata_map = self.config_manager.config.get("game_metadata", {})
@@ -1293,6 +1294,7 @@ class EmulatorHubWindow(QMainWindow):
         if changed:
             self.repopulate_game_list()
 
+    @pyqtSlot()
     def load_game_cache(self):
         # Read from configuration data map
         self.games_data_map.clear()
@@ -4089,8 +4091,31 @@ class EmulatorHubWindow(QMainWindow):
 
             # ----------------------------------------------------------------
             # 4. Auto-fetch IGDB metadata for all newly discovered games
+            #    Skip games that already have real metadata (non-default values)
             # ----------------------------------------------------------------
-            if self.igdb_client.is_configured():
+            _DEFAULT_DEVELOPERS = {"Unknown Developer", ""}
+            _DEFAULT_SUMMARIES  = {"Local PC Game", "Local ROM", ""}
+
+            def _already_has_metadata(entry: dict) -> bool:
+                """Return True if this game already has real IGDB-sourced metadata."""
+                dev = (entry.get("developer") or "").strip()
+                summary = (entry.get("summary") or "").strip()
+                # If developer is filled with a real name the game has been enriched
+                if dev and dev not in _DEFAULT_DEVELOPERS:
+                    return True
+                # If summary is non-trivial (longer than a short placeholder) it's real
+                if summary and not any(summary.lower().startswith(p) for p in ("local pc game", "local rom")):
+                    return True
+                return False
+
+            igdb_candidates = [
+                (ghash, entry) for ghash, entry in new_games
+                if not _already_has_metadata(
+                    self.config_manager.config["game_metadata"].get(ghash, entry)
+                )
+            ]
+
+            if self.igdb_client.is_configured() and igdb_candidates:
                 import concurrent.futures
                 import re as _re
 
@@ -4125,7 +4150,7 @@ class EmulatorHubWindow(QMainWindow):
                 }
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                    futures = {executor.submit(_fetch_new_game_meta, item): item for item in new_games}
+                    futures = {executor.submit(_fetch_new_game_meta, item): item for item in igdb_candidates}
                     for future in concurrent.futures.as_completed(futures):
                         try:
                             ghash, entry, details, clean_title = future.result()

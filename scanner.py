@@ -5,6 +5,47 @@ import json
 import re
 from pathlib import Path
 
+
+def _title_from_exe(exe_path: Path, fallback: str) -> str:
+    """Derive a human-readable game title from an executable filename.
+
+    Strategy (in order):
+    1. Take the filename stem  (e.g. "TheWitcher3.exe" -> "TheWitcher3")
+    2. Replace common word-separator characters with spaces
+    3. Insert a space before every CamelCase boundary
+    4. Strip leading version/build prefixes like 'v1.0', 'build_'
+    5. Title-case the result
+    If the result is empty or obviously generic (e.g. "Game", "Launch"),
+    fall back to *fallback* (usually the folder name).
+    """
+    stem = exe_path.stem.strip()
+    if not stem:
+        return fallback
+
+    # Replace separators with spaces
+    name = re.sub(r'[_\-\.]+', ' ', stem)
+
+    # Split CamelCase / PascalCase boundaries  (e.g. TheWitcher3 -> The Witcher 3)
+    name = re.sub(r'([a-z])([A-Z])', r'\1 \2', name)
+    name = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1 \2', name)
+
+    # Remove leading version tags like "v1" or "1.0" at the very start
+    name = re.sub(r'^\s*v?\d[\d\.]*\s*', '', name, flags=re.IGNORECASE)
+
+    name = ' '.join(name.split())  # collapse whitespace
+
+    if not name:
+        return fallback
+
+    name = name.title()
+
+    # If the cleaned name is a common generic word, prefer the folder name instead
+    _GENERIC = {"Game", "Launch", "Launcher", "Play", "Start", "App", "Client", "Main", "Run"}
+    if name in _GENERIC:
+        return fallback
+
+    return name
+
 class PCGameScanner:
     @staticmethod
     def scan_steam_games():
@@ -150,8 +191,10 @@ class PCGameScanner:
                             
                             # Exclude uninstallers and setup
                             if not any(kw in main_exe.name.lower() for kw in ["unins", "setup", "install", "config"]):
+                                # Derive title from exe name; fall back to folder name
+                                title = _title_from_exe(main_exe, fallback=entry.name)
                                 games.append({
-                                    "title": entry.name,
+                                    "title": title,
                                     "path": str(main_exe),
                                     "platform": "PC",
                                     "tracking_exe": str(main_exe),
@@ -244,8 +287,10 @@ class PCGameScanner:
                         continue
                     main_exe = candidates[0]
 
+                    # Derive title from exe name; fall back to folder name
+                    title = _title_from_exe(main_exe, fallback=entry.name)
                     games.append({
-                        "title": entry.name,
+                        "title": title,
                         "path": str(main_exe),
                         "platform": "PC",
                         "tracking_exe": str(main_exe),
